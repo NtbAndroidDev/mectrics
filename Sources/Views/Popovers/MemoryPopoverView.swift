@@ -13,7 +13,7 @@ public struct MemoryPopoverView: View {
             // Header
             PopoverHeaderView(
                 icon: "memorychip",
-                title: "Memory",
+                title: loc("Memory"),
                 rightText: String(format: "%.1f%%", monitor.memory.usagePercentage),
                 ringProgress: monitor.memory.usagePercentage / 100.0
             )
@@ -52,27 +52,27 @@ public struct MemoryPopoverView: View {
                 
                 // Legend
                 HStack(spacing: 12) {
-                    legendItem(color: MectricsTheme.coral, label: "App")
-                    legendItem(color: MectricsTheme.coralMuted, label: "Wired")
-                    legendItem(color: MectricsTheme.coralDark, label: "Compressed")
-                    legendItem(color: Color(white: 0.45), label: "Cached")
+                    legendItem(color: MectricsTheme.coral, label: loc("App"))
+                    legendItem(color: MectricsTheme.coralMuted, label: loc("Wired"))
+                    legendItem(color: MectricsTheme.coralDark, label: loc("Compressed"))
+                    legendItem(color: Color(white: 0.45), label: loc("Cached"))
                 }
                 .padding(.top, 2)
             }
             
             // Key-Value Breakdown
             VStack(spacing: 2) {
-                PopoverKeyValueRow(label: "App Memory", value: formatGB(monitor.memory.activeBytes))
-                PopoverKeyValueRow(label: "Wired Memory", value: formatGB(monitor.memory.wiredBytes))
-                PopoverKeyValueRow(label: "Compressed", value: formatGB(monitor.memory.compressedBytes))
-                PopoverKeyValueRow(label: "Cached Files", value: formatGB(monitor.memory.cachedBytes))
-                PopoverKeyValueRow(label: "Total RAM", value: formatGB(monitor.memory.totalBytes))
-                PopoverKeyValueRow(label: "Swap Used", value: formatGB(monitor.memory.swapUsedBytes), isHighlighted: monitor.memory.swapUsedBytes > 500 * 1024 * 1024)
+                PopoverKeyValueRow(label: loc("App Memory"), value: formatGB(monitor.memory.activeBytes))
+                PopoverKeyValueRow(label: loc("Wired Memory"), value: formatGB(monitor.memory.wiredBytes))
+                PopoverKeyValueRow(label: loc("Compressed"), value: formatGB(monitor.memory.compressedBytes))
+                PopoverKeyValueRow(label: loc("Cached Files"), value: formatGB(monitor.memory.cachedBytes))
+                PopoverKeyValueRow(label: loc("Total RAM"), value: formatGB(monitor.memory.totalBytes))
+                PopoverKeyValueRow(label: loc("Swap Used"), value: formatGB(monitor.memory.swapUsedBytes), isHighlighted: monitor.memory.swapUsedBytes > 500 * 1024 * 1024)
             }
             .padding(.vertical, 2)
             
             // Action Button
-            PopoverActionButton(icon: "memorychip", title: "Open Activity Monitor (Memory)") {
+            PopoverActionButton(icon: "memorychip", title: loc("Open Activity Monitor (Memory)")) {
                 if let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.apple.ActivityMonitor") {
                     NSWorkspace.shared.openApplication(at: url, configuration: NSWorkspace.OpenConfiguration())
                 }

@@ -13,7 +13,7 @@ public struct BatteryPopoverView: View {
             // Header
             PopoverHeaderView(
                 icon: monitor.battery.isCharging ? "battery.100percent.bolt" : "battery.100percent",
-                title: "Battery",
+                title: loc("Battery"),
                 rightText: String(format: "%.0f%%", monitor.battery.percentage),
                 ringProgress: monitor.battery.percentage / 100.0
             )
@@ -21,36 +21,36 @@ public struct BatteryPopoverView: View {
             // Key-Value List
             VStack(spacing: 2) {
                 PopoverKeyValueRow(
-                    label: "Power Source",
+                    label: loc("Power Source"),
                     value: monitor.battery.powerSource
                 )
                 PopoverKeyValueRow(
-                    label: "State",
-                    value: monitor.battery.isCharging ? "Charging" : (monitor.battery.isPluggedIn ? "Plugged In" : "Discharging")
+                    label: loc("State"),
+                    value: monitor.battery.isCharging ? loc("Charging") : (monitor.battery.isPluggedIn ? loc("Plugged In") : loc("Discharging"))
                 )
                 if let mins = monitor.battery.timeRemainingMinutes {
                     PopoverKeyValueRow(
-                        label: monitor.battery.isCharging ? "Time to Full" : "Time Remaining",
+                        label: monitor.battery.isCharging ? loc("Time to Full") : loc("Time Remaining"),
                         value: "\(mins / 60)h \(mins % 60)m"
                     )
                 }
                 PopoverKeyValueRow(
-                    label: "Health Capacity",
+                    label: loc("Health Capacity"),
                     value: String(format: "%.1f%%", monitor.battery.healthPercentage)
                 )
                 PopoverKeyValueRow(
-                    label: "Cycle Count",
+                    label: loc("Cycle Count"),
                     value: "\(monitor.battery.cycleCount)"
                 )
                 PopoverKeyValueRow(
-                    label: "Condition",
+                    label: loc("Condition"),
                     value: monitor.battery.condition
                 )
             }
             .padding(.vertical, 2)
             
             // Action Button
-            PopoverActionButton(icon: "battery.100percent", title: "Open Battery Settings") {
+            PopoverActionButton(icon: "battery.100percent", title: loc("Open Battery Settings")) {
                 if let url = URL(string: "x-apple.systempreferences:com.apple.Battery-Settings.extension") {
                     NSWorkspace.shared.open(url)
                 } else if let url = URL(string: "x-apple.systempreferences:") {

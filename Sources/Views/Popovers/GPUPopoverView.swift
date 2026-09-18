@@ -13,7 +13,7 @@ public struct GPUPopoverView: View {
             // Header
             PopoverHeaderView(
                 icon: "display",
-                title: "GPU",
+                title: loc("GPU"),
                 rightText: String(format: "%.1f%%", monitor.gpu.usagePercentage),
                 ringProgress: monitor.gpu.usagePercentage / 100.0
             )
@@ -31,16 +31,16 @@ public struct GPUPopoverView: View {
             
             // Key-Value List
             VStack(spacing: 2) {
-                PopoverKeyValueRow(label: "Processor", value: monitor.gpu.name)
-                PopoverKeyValueRow(label: "Working Set VRAM", value: formatBytes(monitor.gpu.memoryUsedBytes))
+                PopoverKeyValueRow(label: loc("Processor"), value: monitor.gpu.name)
+                PopoverKeyValueRow(label: loc("Working Set VRAM"), value: formatBytes(monitor.gpu.memoryUsedBytes))
                 if monitor.gpu.memoryTotalBytes > 0 {
-                    PopoverKeyValueRow(label: "Total Metal VRAM", value: formatBytes(monitor.gpu.memoryTotalBytes))
+                    PopoverKeyValueRow(label: loc("Total Metal VRAM"), value: formatBytes(monitor.gpu.memoryTotalBytes))
                 }
             }
             .padding(.vertical, 2)
             
             // Action Button
-            PopoverActionButton(icon: "display", title: "Open Displays Settings") {
+            PopoverActionButton(icon: "display", title: loc("Open Displays Settings")) {
                 if let url = URL(string: "x-apple.systempreferences:com.apple.Displays-Settings.extension") {
                     NSWorkspace.shared.open(url)
                 } else if let url = URL(string: "x-apple.systempreferences:") {

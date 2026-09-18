@@ -13,7 +13,7 @@ public struct NetworkPopoverView: View {
             // Header
             PopoverHeaderView(
                 icon: "arrow.up.arrow.down",
-                title: "Network",
+                title: loc("Network"),
                 rightText: formatRate(monitor.network.downloadBytesPerSec + monitor.network.uploadBytesPerSec)
             )
             
@@ -21,7 +21,7 @@ public struct NetworkPopoverView: View {
             VStack(alignment: .leading, spacing: 8) {
                 VStack(alignment: .leading, spacing: 2) {
                     HStack {
-                        Text("Download (Inbound)")
+                        Text(loc("Download (Inbound)"))
                             .font(.system(size: 11, weight: .regular))
                             .foregroundStyle(MectricsTheme.textSecondary)
                         Spacer()
@@ -42,7 +42,7 @@ public struct NetworkPopoverView: View {
                 
                 VStack(alignment: .leading, spacing: 2) {
                     HStack {
-                        Text("Upload (Outbound)")
+                        Text(loc("Upload (Outbound)"))
                             .font(.system(size: 11, weight: .regular))
                             .foregroundStyle(MectricsTheme.textSecondary)
                         Spacer()
@@ -64,15 +64,15 @@ public struct NetworkPopoverView: View {
             
             // Key-Value List
             VStack(spacing: 2) {
-                PopoverKeyValueRow(label: "Interface", value: monitor.network.primaryInterfaceName)
-                PopoverKeyValueRow(label: "IP Address", value: monitor.network.ipv4Address)
-                PopoverKeyValueRow(label: "Total Downloaded", value: formatBytes(monitor.network.totalDownloadedBytes))
-                PopoverKeyValueRow(label: "Total Uploaded", value: formatBytes(monitor.network.totalUploadedBytes))
+                PopoverKeyValueRow(label: loc("Interface"), value: monitor.network.primaryInterfaceName)
+                PopoverKeyValueRow(label: loc("IP Address"), value: monitor.network.ipv4Address)
+                PopoverKeyValueRow(label: loc("Total Downloaded"), value: formatBytes(monitor.network.totalDownloadedBytes))
+                PopoverKeyValueRow(label: loc("Total Uploaded"), value: formatBytes(monitor.network.totalUploadedBytes))
             }
             .padding(.vertical, 2)
             
             // Action Button
-            PopoverActionButton(icon: "network", title: "Open Network Settings") {
+            PopoverActionButton(icon: "network", title: loc("Open Network Settings")) {
                 if let url = URL(string: "x-apple.systempreferences:com.apple.Network-Settings.extension") {
                     NSWorkspace.shared.open(url)
                 } else if let url = URL(string: "x-apple.systempreferences:") {

@@ -13,7 +13,7 @@ public struct SensorPopoverView: View {
             // Header
             PopoverHeaderView(
                 icon: "thermometer.medium",
-                title: "Sensors",
+                title: loc("Sensors"),
                 rightText: String(format: "%.1f°C", monitor.sensor.cpuTemperature)
             )
             
@@ -30,19 +30,19 @@ public struct SensorPopoverView: View {
             
             // Key-Value List
             VStack(spacing: 2) {
-                PopoverKeyValueRow(label: "CPU Temperature", value: String(format: "%.1f°C", monitor.sensor.cpuTemperature))
-                PopoverKeyValueRow(label: "GPU Temperature", value: String(format: "%.1f°C", monitor.sensor.gpuTemperature))
-                PopoverKeyValueRow(label: "Thermal Pressure", value: monitor.sensor.thermalPressure.rawValue, isHighlighted: monitor.sensor.thermalPressure != .nominal)
+                PopoverKeyValueRow(label: loc("CPU Temperature"), value: String(format: "%.1f°C", monitor.sensor.cpuTemperature))
+                PopoverKeyValueRow(label: loc("GPU Temperature"), value: String(format: "%.1f°C", monitor.sensor.gpuTemperature))
+                PopoverKeyValueRow(label: loc("Thermal Pressure"), value: monitor.sensor.thermalPressure.rawValue, isHighlighted: monitor.sensor.thermalPressure != .nominal)
                 if let fan = monitor.sensor.fans.first {
-                    PopoverKeyValueRow(label: "Cooling Fan", value: "\(fan.currentRPM) RPM")
+                    PopoverKeyValueRow(label: loc("Cooling Fan"), value: "\(fan.currentRPM) RPM")
                 } else {
-                    PopoverKeyValueRow(label: "Cooling Architecture", value: "Fanless / Passive")
+                    PopoverKeyValueRow(label: loc("Cooling Architecture"), value: loc("Fanless / Passive"))
                 }
             }
             .padding(.vertical, 2)
             
             // Action Button
-            PopoverActionButton(icon: "thermometer.medium", title: "Open Activity Monitor (Energy)") {
+            PopoverActionButton(icon: "thermometer.medium", title: loc("Open Activity Monitor (Energy)")) {
                 if let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.apple.ActivityMonitor") {
                     NSWorkspace.shared.openApplication(at: url, configuration: NSWorkspace.OpenConfiguration())
                 }

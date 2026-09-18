@@ -148,7 +148,7 @@ public struct PopoverFooterView: View {
                 HStack(spacing: 5) {
                     Image(systemName: "gearshape")
                         .font(.system(size: 12))
-                    Text("Settings")
+                    Text(loc("Settings"))
                         .font(.system(size: 12, weight: .regular))
                 }
                 .foregroundStyle(MectricsTheme.coral)
@@ -163,7 +163,7 @@ public struct PopoverFooterView: View {
                 HStack(spacing: 5) {
                     Image(systemName: "power")
                         .font(.system(size: 12))
-                    Text("Quit")
+                    Text(loc("Quit"))
                         .font(.system(size: 12, weight: .regular))
                 }
                 .foregroundStyle(MectricsTheme.coral)

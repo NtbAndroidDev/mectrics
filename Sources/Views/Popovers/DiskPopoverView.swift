@@ -13,7 +13,7 @@ public struct DiskPopoverView: View {
             // Header (Matches Image 3)
             PopoverHeaderView(
                 icon: "internaldrive",
-                title: "Disk",
+                title: loc("Disk"),
                 rightText: String(format: "%.1f%%", monitor.disk.usagePercentage),
                 ringProgress: monitor.disk.usagePercentage / 100.0
             )
@@ -46,26 +46,26 @@ public struct DiskPopoverView: View {
                 
                 // Legend
                 HStack(spacing: 14) {
-                    legendItem(color: MectricsTheme.coral, label: "Used")
-                    legendItem(color: Color(red: 0.42, green: 0.18, blue: 0.22), label: "Purgeable")
-                    legendItem(color: Color(white: 0.45), label: "Free")
+                    legendItem(color: MectricsTheme.coral, label: loc("Used"))
+                    legendItem(color: Color(red: 0.42, green: 0.18, blue: 0.22), label: loc("Purgeable"))
+                    legendItem(color: Color(white: 0.45), label: loc("Free"))
                 }
                 .padding(.top, 2)
             }
             
             // Key-Value List
             VStack(spacing: 2) {
-                PopoverKeyValueRow(label: "Used", value: formatGB(monitor.disk.usedBytes))
-                PopoverKeyValueRow(label: "Free", value: formatGB(monitor.disk.freeBytes))
-                PopoverKeyValueRow(label: "Purgeable", value: formatGB(monitor.disk.purgeableBytes))
-                PopoverKeyValueRow(label: "Total", value: formatGB(monitor.disk.totalBytes))
-                PopoverKeyValueRow(label: "Read", value: formatRate(monitor.disk.readBytesPerSec))
-                PopoverKeyValueRow(label: "Write", value: formatRate(monitor.disk.writeBytesPerSec))
+                PopoverKeyValueRow(label: loc("Used"), value: formatGB(monitor.disk.usedBytes))
+                PopoverKeyValueRow(label: loc("Free"), value: formatGB(monitor.disk.freeBytes))
+                PopoverKeyValueRow(label: loc("Purgeable"), value: formatGB(monitor.disk.purgeableBytes))
+                PopoverKeyValueRow(label: loc("Total"), value: formatGB(monitor.disk.totalBytes))
+                PopoverKeyValueRow(label: loc("Read"), value: formatRate(monitor.disk.readBytesPerSec))
+                PopoverKeyValueRow(label: loc("Write"), value: formatRate(monitor.disk.writeBytesPerSec))
             }
             .padding(.vertical, 2)
             
             // Action Button
-            PopoverActionButton(icon: "internaldrive", title: "Open Storage Settings") {
+            PopoverActionButton(icon: "internaldrive", title: loc("Open Storage Settings")) {
                 if let url = URL(string: "x-apple.systempreferences:com.apple.Storage-Settings.extension") {
                     NSWorkspace.shared.open(url)
                 } else if let url = URL(string: "x-apple.systempreferences:") {

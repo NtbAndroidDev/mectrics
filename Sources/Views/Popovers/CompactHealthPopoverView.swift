@@ -14,7 +14,7 @@ public struct CompactHealthPopoverView: View {
             // Header (Matches Image 2)
             PopoverHeaderView(
                 icon: "checkmark.shield",
-                title: monitor.rulesEngine.activeAlerts.isEmpty ? "All systems normal" : "Active Alerts",
+                title: monitor.rulesEngine.activeAlerts.isEmpty ? loc("All systems normal") : loc("Active Alerts"),
                 iconColor: monitor.rulesEngine.activeAlerts.isEmpty ? .white : MectricsTheme.coral,
                 onRefresh: {
                     monitor.refreshAll()
@@ -23,7 +23,7 @@ public struct CompactHealthPopoverView: View {
             
             // Subtitle
             Text(monitor.rulesEngine.activeAlerts.isEmpty ?
-                 "Mectrics will show selected alert conditions here." :
+                 loc("Mectrics will show selected alert conditions here.") :
                  monitor.rulesEngine.activeAlerts.joined(separator: "\n"))
                 .font(.system(size: 12, weight: .regular))
                 .foregroundStyle(monitor.rulesEngine.activeAlerts.isEmpty ? MectricsTheme.textSecondary : MectricsTheme.coral)
@@ -36,22 +36,22 @@ public struct CompactHealthPopoverView: View {
             VStack(spacing: 8) {
                 statusRow(
                     icon: "cpu",
-                    title: "CPU",
+                    title: loc("CPU"),
                     value: String(format: "%.0f%%", monitor.cpu.totalUsage)
                 )
                 statusRow(
                     icon: "memorychip",
-                    title: "Memory",
+                    title: loc("Memory"),
                     value: String(format: "%.0f%%", monitor.memory.usagePercentage)
                 )
                 statusRow(
                     icon: "arrow.up.arrow.down",
-                    title: "Network",
+                    title: loc("Network"),
                     value: formatNetworkThroughput()
                 )
                 statusRow(
                     icon: "internaldrive",
-                    title: "Disk",
+                    title: loc("Disk"),
                     value: String(format: "%.0f%%", monitor.disk.usagePercentage)
                 )
             }
@@ -59,11 +59,11 @@ public struct CompactHealthPopoverView: View {
             
             // Action Buttons
             VStack(spacing: 8) {
-                PopoverActionButton(icon: "list.bullet.rectangle", title: "Open Attention Log") {
+                PopoverActionButton(icon: "list.bullet.rectangle", title: loc("Open Attention Log")) {
                     AppState.shared.openAttentionLog()
                 }
                 
-                PopoverActionButton(icon: "doc.on.doc", title: copiedSummaryAlert ? "Summary Copied!" : "Copy System Summary") {
+                PopoverActionButton(icon: "doc.on.doc", title: copiedSummaryAlert ? loc("Summary Copied!") : loc("Copy System Summary")) {
                     copySummaryToClipboard()
                     copiedSummaryAlert = true
                     DispatchQueue.main.asyncAfter(deadline: .now() + 2) {

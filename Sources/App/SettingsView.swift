@@ -20,6 +20,8 @@ public enum SettingsTab: String, CaseIterable, Identifiable {
 
 public struct SettingsView: View {
     @ObservedObject var monitor: SystemMonitor
+    @ObservedObject private var themeManager = ThemeManager.shared
+    @ObservedObject private var locManager = LocalizationManager.shared
     @State private var selectedTab: SettingsTab
     @Environment(\.dismiss) private var dismiss
     
@@ -63,7 +65,7 @@ public struct SettingsView: View {
         VStack(spacing: 0) {
             // Window Toolbar (Matches Image 5)
             HStack {
-                Text(selectedTab.rawValue)
+                Text(loc(selectedTab.rawValue))
                     .font(.system(size: 15, weight: .bold))
                     .foregroundStyle(.white)
                 
@@ -75,17 +77,17 @@ public struct SettingsView: View {
                         let isActive = (selectedTab == tab)
                         Button {
                             selectedTab = tab
-                            SettingsWindowController.shared.updateTitle(tab.rawValue)
+                            SettingsWindowController.shared.updateTitle(loc(tab.rawValue))
                         } label: {
                             VStack(spacing: 3) {
                                 Image(systemName: tab.icon)
                                     .font(.system(size: 16, weight: .regular))
                                     .foregroundStyle(isActive ? Color.blue : MectricsTheme.textSecondary)
-                                Text(tab.rawValue)
+                                Text(loc(tab.rawValue))
                                     .font(.system(size: 10, weight: .regular))
                                     .foregroundStyle(isActive ? .white : MectricsTheme.textSecondary)
                             }
-                            .frame(width: 64, height: 44)
+                            .frame(width: 72, height: 44)
                             .background(isActive ? Color(red: 0.18, green: 0.28, blue: 0.42) : Color.clear)
                             .clipShape(RoundedRectangle(cornerRadius: 6))
                             .overlay(
@@ -263,14 +265,14 @@ public struct SettingsView: View {
             
             // Mode Switcher
             VStack(alignment: .leading, spacing: 10) {
-                Text("Display Mode")
+                Text(loc("Display Mode"))
                     .font(.system(size: 13, weight: .bold))
                     .foregroundStyle(.white)
                 
-                Toggle("Compact Health Mode (Single Shield Slot)", isOn: $monitor.useCompactHealthBar)
+                Toggle(loc("Compact Health Mode (Single Shield Slot)"), isOn: $monitor.useCompactHealthBar)
                     .toggleStyle(SwitchToggleStyle(tint: .blue))
                 
-                Text("Gathers all hardware metrics into a single shield icon in the status bar to keep your workspace minimal.")
+                Text(loc("Compact Health Note"))
                     .font(.system(size: 11))
                     .foregroundStyle(MectricsTheme.textSecondary)
             }
@@ -282,13 +284,13 @@ public struct SettingsView: View {
             if !monitor.useCompactHealthBar {
                 VStack(alignment: .leading, spacing: 14) {
                     HStack {
-                        Text("Visible Status Bar Items")
+                        Text(loc("Visible Status Bar Items"))
                             .font(.system(size: 13, weight: .bold))
                             .foregroundStyle(.white)
                         
                         Spacer()
                         
-                        Button("Restore Defaults") {
+                        Button(loc("Restore Defaults")) {
                             restoreDefaultStatusBar()
                         }
                         .font(.system(size: 11))
@@ -300,10 +302,10 @@ public struct SettingsView: View {
                         // 1. Disk
                         itemConfigRow(
                             icon: "internaldrive",
-                            title: "Disk Storage",
+                            title: loc("Disk Storage"),
                             isOn: $monitor.showDiskInMenuBar
                         ) {
-                            Picker("Format:", selection: $monitor.diskDisplayMode) {
+                            Picker(loc("Format:"), selection: $monitor.diskDisplayMode) {
                                 ForEach(DiskDisplayMode.allCases, id: \.self) { mode in
                                     Text(mode.rawValue).tag(mode)
                                 }
@@ -317,10 +319,10 @@ public struct SettingsView: View {
                         // 2. Memory
                         itemConfigRow(
                             icon: "memorychip",
-                            title: "Memory (RAM)",
+                            title: loc("Memory (RAM)"),
                             isOn: $monitor.showMemoryInMenuBar
                         ) {
-                            Toggle("Show mini sparkline history box", isOn: $monitor.showMemorySparkline)
+                            Toggle(loc("Show mini sparkline history box"), isOn: $monitor.showMemorySparkline)
                                 .font(.system(size: 11))
                                 .foregroundStyle(MectricsTheme.textSecondary)
                         }
@@ -330,10 +332,10 @@ public struct SettingsView: View {
                         // 3. CPU
                         itemConfigRow(
                             icon: "cpu",
-                            title: "Processor (CPU)",
+                            title: loc("Processor (CPU)"),
                             isOn: $monitor.showCPUInMenuBar
                         ) {
-                            Toggle("Show live waveform sparkline", isOn: $monitor.showCPUSparkline)
+                            Toggle(loc("Show live waveform sparkline"), isOn: $monitor.showCPUSparkline)
                                 .font(.system(size: 11))
                                 .foregroundStyle(MectricsTheme.textSecondary)
                         }
@@ -343,10 +345,10 @@ public struct SettingsView: View {
                         // 4. Network
                         itemConfigRow(
                             icon: "arrow.up.arrow.down",
-                            title: "Network Throughput",
+                            title: loc("Network Throughput"),
                             isOn: $monitor.showNetworkInMenuBar
                         ) {
-                            Picker("Format:", selection: $monitor.networkDisplayMode) {
+                            Picker(loc("Format:"), selection: $monitor.networkDisplayMode) {
                                 ForEach(NetworkDisplayMode.allCases, id: \.self) { mode in
                                     Text(mode.rawValue).tag(mode)
                                 }
@@ -360,10 +362,12 @@ public struct SettingsView: View {
                         // 5. Battery
                         itemConfigRow(
                             icon: "battery.100percent",
-                            title: "Battery & Power",
+                            title: loc("Battery & Power"),
                             isOn: $monitor.showBatteryInMenuBar
                         ) {
-                            Text("Displays battery percentage and charging bolt on MacBooks. Automatically hides on desktop Macs.")
+                            Text(locManager.currentLanguage == .vietnamese
+                                 ? "Hiển thị mức pin và sạc trên MacBook. Tự động ẩn trên Mac để bàn."
+                                 : "Displays battery percentage and charging bolt on MacBooks. Automatically hides on desktop Macs.")
                                 .font(.system(size: 11))
                                 .foregroundStyle(MectricsTheme.textTertiary)
                         }
@@ -373,10 +377,12 @@ public struct SettingsView: View {
                         // 6. Sensor
                         itemConfigRow(
                             icon: "thermometer.medium",
-                            title: "Sensors & Thermals",
+                            title: loc("Sensors & Thermals"),
                             isOn: $monitor.showSensorInMenuBar
                         ) {
-                            Text("Displays CPU temperature in °C directly on the status bar.")
+                            Text(locManager.currentLanguage == .vietnamese
+                                 ? "Hiển thị nhiệt độ CPU theo °C trực tiếp trên thanh menu."
+                                 : "Displays CPU temperature in °C directly on the status bar.")
                                 .font(.system(size: 11))
                                 .foregroundStyle(MectricsTheme.textTertiary)
                         }
@@ -386,10 +392,12 @@ public struct SettingsView: View {
                         // 7. GPU
                         itemConfigRow(
                             icon: "display",
-                            title: "Graphics (GPU)",
+                            title: loc("Graphics (GPU)"),
                             isOn: $monitor.showGPUInMenuBar
                         ) {
-                            Text("Displays real-time graphics silicon utilization percentage.")
+                            Text(locManager.currentLanguage == .vietnamese
+                                 ? "Hiển thị tỷ lệ phần trăm sử dụng chip đồ hoạ theo thời gian thực."
+                                 : "Displays real-time graphics silicon utilization percentage.")
                                 .font(.system(size: 11))
                                 .foregroundStyle(MectricsTheme.textTertiary)
                         }
@@ -453,12 +461,12 @@ public struct SettingsView: View {
         VStack(alignment: .leading, spacing: 16) {
             // Rules Header
             HStack {
-                Text("Rules")
+                Text(loc("Rules"))
                     .font(.system(size: 13, weight: .bold))
                     .foregroundStyle(.white)
                 Spacer()
                 let activeCount = [cpuRuleEnabled, memRuleEnabled, batRuleEnabled, diskRuleEnabled, diskFreeRuleEnabled, gpuRuleEnabled, tempRuleEnabled].filter { $0 }.count
-                Text("\(activeCount) on · \(monitor.rulesEngine.activeAlerts.count) alerting")
+                Text("\(activeCount) \(loc("on")) · \(monitor.rulesEngine.activeAlerts.count) \(loc("alerting"))")
                     .font(.system(size: 11))
                     .foregroundStyle(MectricsTheme.textTertiary)
             }
@@ -466,11 +474,11 @@ public struct SettingsView: View {
             VStack(spacing: 10) {
                 // 1. CPU
                 ruleRow(
-                    title: "CPU usage above",
+                    title: loc("CPU usage above"),
                     value: $cpuRuleThresh,
                     unit: "%",
                     isOn: $cpuRuleEnabled,
-                    currentText: "Normal · \(String(format: "%.1f%%", monitor.cpu.totalUsage))",
+                    currentText: "\(loc("Normal")) · \(String(format: "%.1f%%", monitor.cpu.totalUsage))",
                     delaySeconds: $cpuRuleDelay
                 )
                 
@@ -478,11 +486,11 @@ public struct SettingsView: View {
                 
                 // 2. Memory
                 ruleRow(
-                    title: "Memory usage above",
+                    title: loc("Memory usage above"),
                     value: $memRuleThresh,
                     unit: "%",
                     isOn: $memRuleEnabled,
-                    currentText: "Normal · \(String(format: "%.1f%%", monitor.memory.usagePercentage))",
+                    currentText: "\(loc("Normal")) · \(String(format: "%.1f%%", monitor.memory.usagePercentage))",
                     delaySeconds: $memRuleDelay
                 )
                 
@@ -490,11 +498,11 @@ public struct SettingsView: View {
                 
                 // 3. Battery
                 ruleRow(
-                    title: "Battery charge below",
+                    title: loc("Battery charge below"),
                     value: $batRuleThresh,
                     unit: "%",
                     isOn: $batRuleEnabled,
-                    currentText: "Normal · \(String(format: "%.0f%%", monitor.battery.percentage))",
+                    currentText: "\(loc("Normal")) · \(String(format: "%.0f%%", monitor.battery.percentage))",
                     delaySeconds: $batRuleDelay
                 )
                 
@@ -502,11 +510,11 @@ public struct SettingsView: View {
                 
                 // 4. Disk usage
                 ruleRow(
-                    title: "Disk usage above",
+                    title: loc("Disk usage above"),
                     value: $diskRuleThresh,
                     unit: "%",
                     isOn: $diskRuleEnabled,
-                    currentText: "Normal · \(String(format: "%.1f%%", monitor.disk.usagePercentage))",
+                    currentText: "\(loc("Normal")) · \(String(format: "%.1f%%", monitor.disk.usagePercentage))",
                     delaySeconds: $diskRuleDelay
                 )
                 
@@ -514,11 +522,11 @@ public struct SettingsView: View {
                 
                 // 5. Free disk space
                 ruleRow(
-                    title: "Free disk space below",
+                    title: loc("Free disk space below"),
                     value: $diskFreeRuleThresh,
                     unit: "GB",
                     isOn: $diskFreeRuleEnabled,
-                    currentText: "Normal · \(monitor.disk.freeBytes / (1024*1024*1024)) GB",
+                    currentText: "\(loc("Normal")) · \(monitor.disk.freeBytes / (1024*1024*1024)) GB",
                     delaySeconds: nil
                 )
                 
@@ -526,11 +534,11 @@ public struct SettingsView: View {
                 
                 // 6. GPU usage
                 ruleRow(
-                    title: "GPU usage above",
+                    title: loc("GPU usage above"),
                     value: $gpuRuleThresh,
                     unit: "%",
                     isOn: $gpuRuleEnabled,
-                    currentText: "Normal · \(String(format: "%.1f%%", monitor.gpu.usagePercentage))",
+                    currentText: "\(loc("Normal")) · \(String(format: "%.1f%%", monitor.gpu.usagePercentage))",
                     delaySeconds: nil
                 )
                 
@@ -538,11 +546,11 @@ public struct SettingsView: View {
                 
                 // 7. CPU temperature
                 ruleRow(
-                    title: "CPU temperature above",
+                    title: loc("CPU temperature above"),
                     value: $tempRuleThresh,
                     unit: "°C",
                     isOn: $tempRuleEnabled,
-                    currentText: "Normal · \(String(format: "%.1f°C", monitor.sensor.cpuTemperature))",
+                    currentText: "\(loc("Normal")) · \(String(format: "%.1f°C", monitor.sensor.cpuTemperature))",
                     delaySeconds: nil
                 )
             }
@@ -551,7 +559,7 @@ public struct SettingsView: View {
             .clipShape(RoundedRectangle(cornerRadius: 8))
             
             // Description paragraph
-            Text("When a rule alerts it notifies you, marks the Compact Health item, and is recorded in the Attention Log. A rule rests for 15 minutes after it alerts.")
+            Text(loc("Alert description"))
                 .font(.system(size: 11))
                 .foregroundStyle(MectricsTheme.textTertiary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -562,12 +570,12 @@ public struct SettingsView: View {
             
             // Notifications Section
             VStack(alignment: .leading, spacing: 10) {
-                Text("Notifications")
+                Text(loc("Notifications"))
                     .font(.system(size: 13, weight: .bold))
                     .foregroundStyle(.white)
                 
                 HStack(spacing: 12) {
-                    Button("Open Notification Settings") {
+                    Button(loc("Open Notification Settings")) {
                         if let url = URL(string: "x-apple.systempreferences:com.apple.preference.notifications") {
                             NSWorkspace.shared.open(url)
                         }
@@ -575,7 +583,7 @@ public struct SettingsView: View {
                     .buttonStyle(.bordered)
                     .tint(.white)
                     
-                    Button(testNotificationSent ? "Notification Sent!" : "Send a Test Notification") {
+                    Button(testNotificationSent ? loc("Notification Sent!") : loc("Send a Test Notification")) {
                         sendTestNotification()
                         testNotificationSent = true
                         DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) {
@@ -586,7 +594,7 @@ public struct SettingsView: View {
                     .tint(.white)
                 }
                 
-                Text("macOS owns notification permission and decides how alerts are presented. Mectrics cannot show one until you allow it there.")
+                Text(loc("Notifications Note"))
                     .font(.system(size: 11))
                     .foregroundStyle(MectricsTheme.textTertiary)
             }
@@ -688,13 +696,81 @@ public struct SettingsView: View {
     // MARK: - General Tab
     private var generalTabContent: some View {
         VStack(alignment: .leading, spacing: 16) {
-            // System Startup
+            // Appearance & Accent Color
             VStack(alignment: .leading, spacing: 12) {
-                Text("Startup")
+                Text(loc("Appearance"))
                     .font(.system(size: 13, weight: .bold))
                     .foregroundStyle(.white)
                 
-                Toggle("Launch Mectrics automatically at login", isOn: $launchAtLogin)
+                VStack(alignment: .leading, spacing: 8) {
+                    Text(loc("Accent Color"))
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(MectricsTheme.textSecondary)
+                    
+                    HStack(spacing: 12) {
+                        ForEach(AccentTheme.allCases) { theme in
+                            let isSelected = (themeManager.currentTheme == theme)
+                            Button {
+                                themeManager.currentTheme = theme
+                            } label: {
+                                VStack(spacing: 4) {
+                                    ZStack {
+                                        Circle()
+                                            .fill(theme.primaryColor)
+                                            .frame(width: 26, height: 26)
+                                        
+                                        if isSelected {
+                                            Circle()
+                                                .strokeBorder(Color.white, lineWidth: 2)
+                                                .frame(width: 26, height: 26)
+                                            Image(systemName: "checkmark")
+                                                .font(.system(size: 10, weight: .black))
+                                                .foregroundStyle(.white)
+                                        }
+                                    }
+                                    
+                                    Text(theme.rawValue)
+                                        .font(.system(size: 10, weight: isSelected ? .bold : .regular))
+                                        .foregroundStyle(isSelected ? .white : MectricsTheme.textTertiary)
+                                }
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                    .padding(.vertical, 4)
+                }
+                
+                Divider()
+                    .overlay(Color.white.opacity(0.06))
+                
+                // Language Selection
+                HStack {
+                    Text(loc("Language"))
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(MectricsTheme.textSecondary)
+                    
+                    Spacer()
+                    
+                    Picker("", selection: $locManager.currentLanguage) {
+                        ForEach(AppLanguage.allCases) { lang in
+                            Text(lang.displayName).tag(lang)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+                    .frame(width: 180)
+                }
+            }
+            .padding()
+            .background(Color.white.opacity(0.04))
+            .clipShape(RoundedRectangle(cornerRadius: 8))
+            
+            // System Startup
+            VStack(alignment: .leading, spacing: 12) {
+                Text(loc("Startup"))
+                    .font(.system(size: 13, weight: .bold))
+                    .foregroundStyle(.white)
+                
+                Toggle(loc("Launch Mectrics automatically at login"), isOn: $launchAtLogin)
                     .onChange(of: launchAtLogin) { _, newValue in
                         LaunchAtLoginManager.isEnabled = newValue
                     }
@@ -705,21 +781,21 @@ public struct SettingsView: View {
             
             // Performance & Sampling
             VStack(alignment: .leading, spacing: 12) {
-                Text("Performance & Polling")
+                Text(loc("Performance & Polling"))
                     .font(.system(size: 13, weight: .bold))
                     .foregroundStyle(.white)
                 
                 HStack {
-                    Text("Hardware Refresh Rate:")
+                    Text(loc("Hardware Refresh Rate:"))
                         .font(.system(size: 12))
                     Spacer()
                     Picker("", selection: $monitor.updateInterval) {
-                        Text("500ms (High precision)").tag(0.5)
-                        Text("1.0s (Recommended)").tag(1.0)
-                        Text("2.0s (Battery efficient)").tag(2.0)
-                        Text("5.0s (Minimal)").tag(5.0)
+                        Text(locManager.currentLanguage == .vietnamese ? "500ms (Độ chính xác cao)" : "500ms (High precision)").tag(0.5)
+                        Text(locManager.currentLanguage == .vietnamese ? "1.0s (Khuyên dùng)" : "1.0s (Recommended)").tag(1.0)
+                        Text(locManager.currentLanguage == .vietnamese ? "2.0s (Tiết kiệm pin)" : "2.0s (Battery efficient)").tag(2.0)
+                        Text(locManager.currentLanguage == .vietnamese ? "5.0s (Tối thiểu)" : "5.0s (Minimal)").tag(5.0)
                     }
-                    .frame(width: 190)
+                    .frame(width: 200)
                 }
             }
             .padding()
@@ -731,10 +807,10 @@ public struct SettingsView: View {
                 HStack {
                     Image(systemName: "checkmark.shield.fill")
                         .foregroundStyle(MectricsTheme.coral)
-                    Text("Zero Network Requests Guarantee")
+                    Text(loc("Zero Network Requests Guarantee"))
                         .font(.system(size: 12, weight: .bold))
                 }
-                Text("Mectrics operates 100% offline using Darwin Mach kernel, sysctl, and IOKit APIs. No telemetry, crash reporting, or network sockets are ever opened.")
+                Text(loc("Offline Guarantee Note"))
                     .font(.system(size: 11))
                     .foregroundStyle(MectricsTheme.textSecondary)
             }
@@ -752,7 +828,9 @@ public struct SettingsView: View {
                         .font(.system(size: 11))
                         .foregroundStyle(MectricsTheme.textTertiary)
                 }
-                Text("Designed natively with Swift 6 and SwiftUI. Free and open source.")
+                Text(locManager.currentLanguage == .vietnamese
+                     ? "Thiết kế thuần Swift 6 và SwiftUI. Mã nguồn mở và hoàn toàn bảo mật."
+                     : "Designed natively with Swift 6 and SwiftUI. Free and open source.")
                     .font(.system(size: 11))
                     .foregroundStyle(MectricsTheme.textSecondary)
             }

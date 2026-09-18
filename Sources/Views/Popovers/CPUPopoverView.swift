@@ -14,7 +14,7 @@ public struct CPUPopoverView: View {
             // Header
             PopoverHeaderView(
                 icon: "cpu",
-                title: "CPU",
+                title: loc("CPU"),
                 rightText: String(format: "%.1f%%", monitor.cpu.totalUsage)
             )
             
@@ -54,19 +54,19 @@ public struct CPUPopoverView: View {
             // Info List
             VStack(spacing: 2) {
                 PopoverKeyValueRow(
-                    label: "Cores",
+                    label: loc("Cores"),
                     value: "\(monitor.cpu.logicalCores)"
                 )
                 PopoverKeyValueRow(
-                    label: "Busiest core",
+                    label: loc("Busiest core"),
                     value: String(format: "%.0f%%", monitor.cpu.busiestCoreUsage)
                 )
                 PopoverKeyValueRow(
-                    label: "Temperature",
+                    label: loc("Temperature"),
                     value: String(format: "%.1f°C", monitor.sensor.cpuTemperature)
                 )
                 PopoverKeyValueRow(
-                    label: "Uptime",
+                    label: loc("Uptime"),
                     value: ProcessMonitor.formattedUptime()
                 )
             }
@@ -81,7 +81,7 @@ public struct CPUPopoverView: View {
                     HStack(spacing: 4) {
                         Image(systemName: showTopProcesses ? "chevron.down" : "chevron.right")
                             .font(.system(size: 9, weight: .bold))
-                        Text("Top processes")
+                        Text(loc("Top processes"))
                             .font(.system(size: 12, weight: .medium))
                     }
                     .foregroundStyle(MectricsTheme.coral)
@@ -111,7 +111,7 @@ public struct CPUPopoverView: View {
             }
             
             // Open Activity Monitor Action Button
-            PopoverActionButton(icon: "speedometer", title: "Open Activity Monitor") {
+            PopoverActionButton(icon: "speedometer", title: loc("Open Activity Monitor")) {
                 if let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.apple.ActivityMonitor") {
                     NSWorkspace.shared.openApplication(at: url, configuration: NSWorkspace.OpenConfiguration())
                 } else {
