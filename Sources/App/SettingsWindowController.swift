@@ -7,7 +7,7 @@ public final class SettingsWindowController: NSObject, NSWindowDelegate {
     
     private var window: NSWindow?
     
-    public func show(tab: SettingsTab = .alerts) {
+    public func show(tab: SettingsTab = .menuBar) {
         if let existing = window {
             existing.title = tab.rawValue
             existing.makeKeyAndOrderFront(nil)

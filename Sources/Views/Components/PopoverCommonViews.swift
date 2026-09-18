@@ -136,7 +136,7 @@ public struct PopoverFooterView: View {
     public var body: some View {
         HStack {
             Button {
-                AppState.shared.openSettings(tab: .alerts)
+                AppState.shared.openSettings(tab: .menuBar)
             } label: {
                 HStack(spacing: 4) {
                     Image(systemName: "gearshape")

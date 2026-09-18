@@ -17,22 +17,25 @@ struct MectricsApp: App {
         }
         .menuBarExtraStyle(.window)
         
-        // MARK: - 2. Disk Item (e.g. "59GB")
+        // MARK: - 2. Disk Item
         MenuBarExtra(isInserted: Binding(
             get: { !appState.monitor.useCompactHealthBar && appState.monitor.showDiskInMenuBar },
             set: { appState.monitor.showDiskInMenuBar = $0 }
         )) {
             DiskPopoverView(monitor: appState.monitor)
         } label: {
+            let diskText = (appState.monitor.diskDisplayMode == .percentage)
+                ? String(format: "%.0f%%", appState.monitor.disk.usagePercentage)
+                : "\(appState.monitor.disk.freeBytes / (1024 * 1024 * 1024))GB"
             MenuBarItemView(
                 icon: "internaldrive",
-                valueText: "\(appState.monitor.disk.freeBytes / (1024 * 1024 * 1024))GB",
+                valueText: diskText,
                 tintColor: MectricsTheme.coral
             )
         }
         .menuBarExtraStyle(.window)
         
-        // MARK: - 3. Memory Item (e.g. "72%" + boxed sparkline)
+        // MARK: - 3. Memory Item
         MenuBarExtra(isInserted: Binding(
             get: { !appState.monitor.useCompactHealthBar && appState.monitor.showMemoryInMenuBar },
             set: { appState.monitor.showMemoryInMenuBar = $0 }
@@ -42,14 +45,14 @@ struct MectricsApp: App {
             MenuBarItemView(
                 icon: "memorychip",
                 valueText: String(format: "%.0f%%", appState.monitor.memory.usagePercentage),
-                sparklineValues: appState.monitor.memoryHistory.values,
+                sparklineValues: appState.monitor.showMemorySparkline ? appState.monitor.memoryHistory.values : nil,
                 isBoxedSparkline: true,
                 tintColor: MectricsTheme.coral
             )
         }
         .menuBarExtraStyle(.window)
         
-        // MARK: - 4. CPU Item (e.g. "26%" + live sparkline waveform)
+        // MARK: - 4. CPU Item
         MenuBarExtra(isInserted: Binding(
             get: { !appState.monitor.useCompactHealthBar && appState.monitor.showCPUInMenuBar },
             set: { appState.monitor.showCPUInMenuBar = $0 }
@@ -59,29 +62,38 @@ struct MectricsApp: App {
             MenuBarItemView(
                 icon: "cpu",
                 valueText: String(format: "%.0f%%", appState.monitor.cpu.totalUsage),
-                sparklineValues: appState.monitor.cpuHistory.values,
+                sparklineValues: appState.monitor.showCPUSparkline ? appState.monitor.cpuHistory.values : nil,
                 isBoxedSparkline: false,
                 tintColor: MectricsTheme.coral
             )
         }
         .menuBarExtraStyle(.window)
         
-        // MARK: - 5. Network Item (e.g. "↓4.1K / ↑6.2K")
+        // MARK: - 5. Network Item
         MenuBarExtra(isInserted: Binding(
             get: { !appState.monitor.useCompactHealthBar && appState.monitor.showNetworkInMenuBar },
             set: { appState.monitor.showNetworkInMenuBar = $0 }
         )) {
             NetworkPopoverView(monitor: appState.monitor)
         } label: {
-            NetworkMenuBarView(
-                downloadBytes: appState.monitor.network.downloadBytesPerSec,
-                uploadBytes: appState.monitor.network.uploadBytesPerSec,
-                tintColor: MectricsTheme.coral
-            )
+            if appState.monitor.networkDisplayMode == .stacked {
+                NetworkMenuBarView(
+                    downloadBytes: appState.monitor.network.downloadBytesPerSec,
+                    uploadBytes: appState.monitor.network.uploadBytesPerSec,
+                    tintColor: MectricsTheme.coral
+                )
+            } else {
+                let totalRate = appState.monitor.network.downloadBytesPerSec + appState.monitor.network.uploadBytesPerSec
+                MenuBarItemView(
+                    icon: "arrow.up.arrow.down",
+                    valueText: formatSingleRate(totalRate),
+                    tintColor: MectricsTheme.coral
+                )
+            }
         }
         .menuBarExtraStyle(.window)
         
-        // MARK: - 6. Battery Item (Optional)
+        // MARK: - 6. Battery Item
         MenuBarExtra(isInserted: Binding(
             get: { !appState.monitor.useCompactHealthBar && appState.monitor.showBatteryInMenuBar && appState.monitor.battery.isPresent },
             set: { appState.monitor.showBatteryInMenuBar = $0 }
@@ -96,7 +108,7 @@ struct MectricsApp: App {
         }
         .menuBarExtraStyle(.window)
         
-        // MARK: - 7. GPU Item (Optional)
+        // MARK: - 7. GPU Item
         MenuBarExtra(isInserted: Binding(
             get: { !appState.monitor.useCompactHealthBar && appState.monitor.showGPUInMenuBar },
             set: { appState.monitor.showGPUInMenuBar = $0 }
@@ -112,7 +124,7 @@ struct MectricsApp: App {
         }
         .menuBarExtraStyle(.window)
         
-        // MARK: - 8. Sensor Item (Optional)
+        // MARK: - 8. Sensor Item
         MenuBarExtra(isInserted: Binding(
             get: { !appState.monitor.useCompactHealthBar && appState.monitor.showSensorInMenuBar },
             set: { appState.monitor.showSensorInMenuBar = $0 }
@@ -127,5 +139,15 @@ struct MectricsApp: App {
             )
         }
         .menuBarExtraStyle(.window)
+    }
+    
+    private func formatSingleRate(_ bytes: Double) -> String {
+        if bytes >= 1024 * 1024 {
+            return String(format: "%.1fM/s", bytes / (1024 * 1024))
+        } else if bytes >= 1024 {
+            return String(format: "%.0fK/s", bytes / 1024)
+        } else {
+            return "0K/s"
+        }
     }
 }

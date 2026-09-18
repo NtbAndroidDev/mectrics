@@ -12,7 +12,7 @@ public final class AppState: ObservableObject {
         NSApplication.shared.setActivationPolicy(.accessory)
     }
     
-    public func openSettings(tab: SettingsTab = .alerts) {
+    public func openSettings(tab: SettingsTab = .menuBar) {
         SettingsWindowController.shared.show(tab: tab)
     }
 }

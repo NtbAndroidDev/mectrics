@@ -3,17 +3,17 @@ import UserNotifications
 import AppKit
 
 public enum SettingsTab: String, CaseIterable, Identifiable {
-    case general = "General"
-    case menuBar = "Menu Bar"
+    case menuBar = "Status Bar"
     case alerts = "Alerts"
+    case general = "General"
     
     public var id: String { rawValue }
     
     public var icon: String {
         switch self {
-        case .general: return "gearshape"
         case .menuBar: return "square.grid.2x2"
         case .alerts: return "bell"
+        case .general: return "gearshape"
         }
     }
 }
@@ -54,7 +54,7 @@ public struct SettingsView: View {
     
     @State private var testNotificationSent = false
     
-    public init(monitor: SystemMonitor, initialTab: SettingsTab = .alerts) {
+    public init(monitor: SystemMonitor, initialTab: SettingsTab = .menuBar) {
         self.monitor = monitor
         self._selectedTab = State(initialValue: initialTab)
     }
@@ -102,10 +102,10 @@ public struct SettingsView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 18) {
                     switch selectedTab {
-                    case .alerts:
-                        alertsTabContent
                     case .menuBar:
                         menuBarTabContent
+                    case .alerts:
+                        alertsTabContent
                     case .general:
                         generalTabContent
                     }
@@ -113,12 +113,328 @@ public struct SettingsView: View {
                 .padding(20)
             }
         }
-        .frame(width: 530, height: 620)
+        .frame(width: 550, height: 640)
         .background(Color(red: 0.11, green: 0.11, blue: 0.12))
         .preferredColorScheme(.dark)
         .onAppear {
             syncRulesToEngine()
         }
+    }
+    
+    // MARK: - Status Bar / Menu Bar Tab
+    private var menuBarTabContent: some View {
+        VStack(alignment: .leading, spacing: 18) {
+            // Live Status Bar Preview Box
+            VStack(alignment: .leading, spacing: 8) {
+                HStack {
+                    Text("Live Status Bar Preview")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(MectricsTheme.textSecondary)
+                    Spacer()
+                    Text("macOS Menu Bar")
+                        .font(.system(size: 10))
+                        .foregroundStyle(MectricsTheme.textTertiary)
+                }
+                
+                HStack(spacing: 14) {
+                    if monitor.useCompactHealthBar {
+                        HStack(spacing: 4) {
+                            Image(systemName: "checkmark.shield")
+                                .font(.system(size: 11, weight: .semibold))
+                                .foregroundStyle(MectricsTheme.coral)
+                            Text("Healthy")
+                                .font(.system(size: 11, weight: .medium))
+                                .foregroundStyle(.white)
+                        }
+                    } else {
+                        if monitor.showDiskInMenuBar {
+                            HStack(spacing: 4) {
+                                Image(systemName: "internaldrive")
+                                    .font(.system(size: 11, weight: .semibold))
+                                    .foregroundStyle(MectricsTheme.coral)
+                                let diskText = (monitor.diskDisplayMode == .percentage)
+                                    ? String(format: "%.0f%%", monitor.disk.usagePercentage)
+                                    : "\(monitor.disk.freeBytes / (1024*1024*1024))GB"
+                                Text(diskText)
+                                    .font(.system(size: 11, weight: .semibold, design: .monospaced))
+                                    .foregroundStyle(.white)
+                            }
+                        }
+                        if monitor.showMemoryInMenuBar {
+                            HStack(spacing: 4) {
+                                Image(systemName: "memorychip")
+                                    .font(.system(size: 11, weight: .semibold))
+                                    .foregroundStyle(MectricsTheme.coral)
+                                Text(String(format: "%.0f%%", monitor.memory.usagePercentage))
+                                    .font(.system(size: 11, weight: .semibold, design: .monospaced))
+                                    .foregroundStyle(.white)
+                                if monitor.showMemorySparkline {
+                                    RoundedRectangle(cornerRadius: 2)
+                                        .fill(Color(white: 0.2))
+                                        .frame(width: 20, height: 10)
+                                }
+                            }
+                        }
+                        if monitor.showCPUInMenuBar {
+                            HStack(spacing: 4) {
+                                Image(systemName: "cpu")
+                                    .font(.system(size: 11, weight: .semibold))
+                                    .foregroundStyle(MectricsTheme.coral)
+                                Text(String(format: "%.0f%%", monitor.cpu.totalUsage))
+                                    .font(.system(size: 11, weight: .semibold, design: .monospaced))
+                                    .foregroundStyle(.white)
+                                if monitor.showCPUSparkline {
+                                    SparklineView(
+                                        values: monitor.cpuHistory.values,
+                                        strokeColor: MectricsTheme.coral,
+                                        lineWidth: 1.2,
+                                        showFill: false
+                                    )
+                                    .frame(width: 24, height: 10)
+                                }
+                            }
+                        }
+                        if monitor.showNetworkInMenuBar {
+                            HStack(spacing: 4) {
+                                Image(systemName: "arrow.up.arrow.down")
+                                    .font(.system(size: 11, weight: .semibold))
+                                    .foregroundStyle(MectricsTheme.coral)
+                                if monitor.networkDisplayMode == .stacked {
+                                    VStack(alignment: .leading, spacing: -1) {
+                                        Text("↓1.0K").font(.system(size: 8, weight: .semibold, design: .monospaced))
+                                        Text("↑1.0K").font(.system(size: 8, weight: .semibold, design: .monospaced))
+                                    }
+                                } else {
+                                    Text("2.0K/s")
+                                        .font(.system(size: 10, weight: .semibold, design: .monospaced))
+                                }
+                            }
+                        }
+                        if monitor.showBatteryInMenuBar && monitor.battery.isPresent {
+                            HStack(spacing: 3) {
+                                Image(systemName: "battery.100percent")
+                                    .font(.system(size: 11, weight: .semibold))
+                                    .foregroundStyle(MectricsTheme.coral)
+                                Text(String(format: "%.0f%%", monitor.battery.percentage))
+                                    .font(.system(size: 11, weight: .semibold, design: .monospaced))
+                            }
+                        }
+                        if monitor.showSensorInMenuBar {
+                            HStack(spacing: 3) {
+                                Image(systemName: "thermometer.medium")
+                                    .font(.system(size: 11, weight: .semibold))
+                                    .foregroundStyle(MectricsTheme.coral)
+                                Text("\(Int(monitor.sensor.cpuTemperature))°C")
+                                    .font(.system(size: 11, weight: .semibold, design: .monospaced))
+                            }
+                        }
+                        if monitor.showGPUInMenuBar {
+                            HStack(spacing: 3) {
+                                Image(systemName: "display")
+                                    .font(.system(size: 11, weight: .semibold))
+                                    .foregroundStyle(MectricsTheme.coral)
+                                Text(String(format: "%.0f%%", monitor.gpu.usagePercentage))
+                                    .font(.system(size: 11, weight: .semibold, design: .monospaced))
+                            }
+                        }
+                    }
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 10)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(Color.black.opacity(0.7))
+                .clipShape(RoundedRectangle(cornerRadius: 8))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 8)
+                        .stroke(Color.white.opacity(0.12), lineWidth: 1)
+                )
+            }
+            
+            // Mode Switcher
+            VStack(alignment: .leading, spacing: 10) {
+                Text("Display Mode")
+                    .font(.system(size: 13, weight: .bold))
+                    .foregroundStyle(.white)
+                
+                Toggle("Compact Health Mode (Single Shield Slot)", isOn: $monitor.useCompactHealthBar)
+                    .toggleStyle(SwitchToggleStyle(tint: .blue))
+                
+                Text("Gathers all hardware metrics into a single shield icon in the status bar to keep your workspace minimal.")
+                    .font(.system(size: 11))
+                    .foregroundStyle(MectricsTheme.textSecondary)
+            }
+            .padding(14)
+            .background(Color.white.opacity(0.04))
+            .clipShape(RoundedRectangle(cornerRadius: 8))
+            
+            // Individual Items Configuration
+            if !monitor.useCompactHealthBar {
+                VStack(alignment: .leading, spacing: 14) {
+                    HStack {
+                        Text("Visible Status Bar Items")
+                            .font(.system(size: 13, weight: .bold))
+                            .foregroundStyle(.white)
+                        
+                        Spacer()
+                        
+                        Button("Restore Defaults") {
+                            restoreDefaultStatusBar()
+                        }
+                        .font(.system(size: 11))
+                        .foregroundStyle(MectricsTheme.coral)
+                        .buttonStyle(.plain)
+                    }
+                    
+                    VStack(spacing: 12) {
+                        // 1. Disk
+                        itemConfigRow(
+                            icon: "internaldrive",
+                            title: "Disk Storage",
+                            isOn: $monitor.showDiskInMenuBar
+                        ) {
+                            Picker("Format:", selection: $monitor.diskDisplayMode) {
+                                ForEach(DiskDisplayMode.allCases, id: \.self) { mode in
+                                    Text(mode.rawValue).tag(mode)
+                                }
+                            }
+                            .pickerStyle(.segmented)
+                            .frame(maxWidth: .infinity)
+                        }
+                        
+                        Divider().overlay(Color.white.opacity(0.06))
+                        
+                        // 2. Memory
+                        itemConfigRow(
+                            icon: "memorychip",
+                            title: "Memory (RAM)",
+                            isOn: $monitor.showMemoryInMenuBar
+                        ) {
+                            Toggle("Show mini sparkline history box", isOn: $monitor.showMemorySparkline)
+                                .font(.system(size: 11))
+                                .foregroundStyle(MectricsTheme.textSecondary)
+                        }
+                        
+                        Divider().overlay(Color.white.opacity(0.06))
+                        
+                        // 3. CPU
+                        itemConfigRow(
+                            icon: "cpu",
+                            title: "Processor (CPU)",
+                            isOn: $monitor.showCPUInMenuBar
+                        ) {
+                            Toggle("Show live waveform sparkline", isOn: $monitor.showCPUSparkline)
+                                .font(.system(size: 11))
+                                .foregroundStyle(MectricsTheme.textSecondary)
+                        }
+                        
+                        Divider().overlay(Color.white.opacity(0.06))
+                        
+                        // 4. Network
+                        itemConfigRow(
+                            icon: "arrow.up.arrow.down",
+                            title: "Network Throughput",
+                            isOn: $monitor.showNetworkInMenuBar
+                        ) {
+                            Picker("Format:", selection: $monitor.networkDisplayMode) {
+                                ForEach(NetworkDisplayMode.allCases, id: \.self) { mode in
+                                    Text(mode.rawValue).tag(mode)
+                                }
+                            }
+                            .pickerStyle(.segmented)
+                            .frame(maxWidth: .infinity)
+                        }
+                        
+                        Divider().overlay(Color.white.opacity(0.06))
+                        
+                        // 5. Battery
+                        itemConfigRow(
+                            icon: "battery.100percent",
+                            title: "Battery & Power",
+                            isOn: $monitor.showBatteryInMenuBar
+                        ) {
+                            Text("Displays battery percentage and charging bolt on MacBooks. Automatically hides on desktop Macs.")
+                                .font(.system(size: 11))
+                                .foregroundStyle(MectricsTheme.textTertiary)
+                        }
+                        
+                        Divider().overlay(Color.white.opacity(0.06))
+                        
+                        // 6. Sensor
+                        itemConfigRow(
+                            icon: "thermometer.medium",
+                            title: "Sensors & Thermals",
+                            isOn: $monitor.showSensorInMenuBar
+                        ) {
+                            Text("Displays CPU temperature in °C directly on the status bar.")
+                                .font(.system(size: 11))
+                                .foregroundStyle(MectricsTheme.textTertiary)
+                        }
+                        
+                        Divider().overlay(Color.white.opacity(0.06))
+                        
+                        // 7. GPU
+                        itemConfigRow(
+                            icon: "display",
+                            title: "Graphics (GPU)",
+                            isOn: $monitor.showGPUInMenuBar
+                        ) {
+                            Text("Displays real-time graphics silicon utilization percentage.")
+                                .font(.system(size: 11))
+                                .foregroundStyle(MectricsTheme.textTertiary)
+                        }
+                    }
+                }
+                .padding(14)
+                .background(Color.white.opacity(0.04))
+                .clipShape(RoundedRectangle(cornerRadius: 8))
+            }
+        }
+    }
+    
+    private func itemConfigRow<Content: View>(
+        icon: String,
+        title: String,
+        isOn: Binding<Bool>,
+        @ViewBuilder extraContent: () -> Content
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Image(systemName: icon)
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(MectricsTheme.coral)
+                    .frame(width: 20)
+                
+                Text(title)
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundStyle(.white)
+                
+                Spacer()
+                
+                Toggle("", isOn: isOn)
+                    .labelsHidden()
+                    .toggleStyle(SwitchToggleStyle(tint: .blue))
+            }
+            
+            if isOn.wrappedValue {
+                extraContent()
+                    .padding(.leading, 24)
+            }
+        }
+    }
+    
+    private func restoreDefaultStatusBar() {
+        monitor.useCompactHealthBar = false
+        monitor.showDiskInMenuBar = true
+        monitor.diskDisplayMode = .freeSpace
+        monitor.showMemoryInMenuBar = true
+        monitor.showMemorySparkline = true
+        monitor.showCPUInMenuBar = true
+        monitor.showCPUSparkline = true
+        monitor.showNetworkInMenuBar = true
+        monitor.networkDisplayMode = .stacked
+        monitor.showBatteryInMenuBar = true
+        monitor.showSensorInMenuBar = true
+        monitor.showGPUInMenuBar = false
     }
     
     // MARK: - Alerts Tab (Matches Reference Image 5)
@@ -341,98 +657,6 @@ public struct SettingsView: View {
             }
         }
         .padding(.vertical, 2)
-    }
-    
-    // MARK: - Menu Bar Tab
-    private var menuBarTabContent: some View {
-        VStack(alignment: .leading, spacing: 18) {
-            // Live Preview Card
-            VStack(alignment: .leading, spacing: 8) {
-                Text("Live Menu Bar Preview")
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundStyle(MectricsTheme.textSecondary)
-                
-                HStack(spacing: 12) {
-                    if monitor.useCompactHealthBar {
-                        Image(systemName: "checkmark.shield")
-                            .foregroundStyle(MectricsTheme.coral)
-                    } else {
-                        if monitor.showDiskInMenuBar {
-                            HStack(spacing: 3) {
-                                Image(systemName: "internaldrive")
-                                    .foregroundStyle(MectricsTheme.coral)
-                                Text("\(monitor.disk.freeBytes / (1024*1024*1024))GB")
-                                    .font(.system(size: 11, weight: .semibold, design: .monospaced))
-                            }
-                        }
-                        if monitor.showMemoryInMenuBar {
-                            HStack(spacing: 3) {
-                                Image(systemName: "memorychip")
-                                    .foregroundStyle(MectricsTheme.coral)
-                                Text(String(format: "%.0f%%", monitor.memory.usagePercentage))
-                                    .font(.system(size: 11, weight: .semibold, design: .monospaced))
-                            }
-                        }
-                        if monitor.showCPUInMenuBar {
-                            HStack(spacing: 3) {
-                                Image(systemName: "cpu")
-                                    .foregroundStyle(MectricsTheme.coral)
-                                Text(String(format: "%.0f%%", monitor.cpu.totalUsage))
-                                    .font(.system(size: 11, weight: .semibold, design: .monospaced))
-                            }
-                        }
-                        if monitor.showNetworkInMenuBar {
-                            HStack(spacing: 3) {
-                                Image(systemName: "arrow.up.arrow.down")
-                                    .foregroundStyle(MectricsTheme.coral)
-                                Text("↓1.0K ↑1.0K")
-                                    .font(.system(size: 9, weight: .semibold, design: .monospaced))
-                            }
-                        }
-                    }
-                }
-                .padding(.horizontal, 14)
-                .padding(.vertical, 8)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(Color.black.opacity(0.6))
-                .clipShape(RoundedRectangle(cornerRadius: 6))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 6)
-                        .stroke(Color.white.opacity(0.1), lineWidth: 1)
-                )
-            }
-            
-            VStack(alignment: .leading, spacing: 12) {
-                Text("Display Mode")
-                    .font(.system(size: 13, weight: .bold))
-                    .foregroundStyle(.white)
-                
-                Toggle("Compact Health Bar (Single Slot)", isOn: $monitor.useCompactHealthBar)
-                    .help("Folds all hardware meters into a single shield icon to save menu bar space.")
-            }
-            .padding()
-            .background(Color.white.opacity(0.04))
-            .clipShape(RoundedRectangle(cornerRadius: 8))
-            
-            if !monitor.useCompactHealthBar {
-                VStack(alignment: .leading, spacing: 12) {
-                    Text("Individual Item Visibility")
-                        .font(.system(size: 13, weight: .bold))
-                        .foregroundStyle(.white)
-                    
-                    Toggle("Disk Free Space", isOn: $monitor.showDiskInMenuBar)
-                    Toggle("Memory Usage & Sparkline Box", isOn: $monitor.showMemoryInMenuBar)
-                    Toggle("CPU Usage & Live Waveform", isOn: $monitor.showCPUInMenuBar)
-                    Toggle("Network Inbound / Outbound", isOn: $monitor.showNetworkInMenuBar)
-                    Toggle("Battery Status", isOn: $monitor.showBatteryInMenuBar)
-                    Toggle("GPU Graphics Utilization", isOn: $monitor.showGPUInMenuBar)
-                    Toggle("Sensors & Thermal Pressure", isOn: $monitor.showSensorInMenuBar)
-                }
-                .padding()
-                .background(Color.white.opacity(0.04))
-                .clipShape(RoundedRectangle(cornerRadius: 8))
-            }
-        }
     }
     
     // MARK: - General Tab

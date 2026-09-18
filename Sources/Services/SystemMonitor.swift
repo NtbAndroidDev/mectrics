@@ -1,6 +1,16 @@
 import Foundation
 import Combine
 
+public enum DiskDisplayMode: String, Codable, CaseIterable {
+    case freeSpace = "Free Space (e.g. 59GB)"
+    case percentage = "Used Percentage (e.g. 76%)"
+}
+
+public enum NetworkDisplayMode: String, Codable, CaseIterable {
+    case stacked = "Stacked Down/Up (↓4.1K / ↑6.2K)"
+    case totalRate = "Single Total (e.g. 10.3 KB/s)"
+}
+
 @MainActor
 public final class SystemMonitor: ObservableObject {
     public static let shared = SystemMonitor()
@@ -28,18 +38,55 @@ public final class SystemMonitor: ObservableObject {
     // Rules Engine
     public let rulesEngine = RulesEngine()
     
-    // Preferences & Settings
-    @Published public var updateInterval: Double = 1.0 {
-        didSet { restartTimer() }
+    // Preferences & Settings (Persisted in UserDefaults)
+    @Published public var updateInterval: Double {
+        didSet {
+            UserDefaults.standard.set(updateInterval, forKey: "pref_updateInterval")
+            restartTimer()
+        }
     }
-    @Published public var useCompactHealthBar: Bool = false
-    @Published public var showCPUInMenuBar: Bool = true
-    @Published public var showMemoryInMenuBar: Bool = true
-    @Published public var showBatteryInMenuBar: Bool = true
-    @Published public var showNetworkInMenuBar: Bool = true
-    @Published public var showDiskInMenuBar: Bool = true
-    @Published public var showGPUInMenuBar: Bool = false
-    @Published public var showSensorInMenuBar: Bool = true
+    
+    @Published public var useCompactHealthBar: Bool {
+        didSet { UserDefaults.standard.set(useCompactHealthBar, forKey: "pref_useCompactHealthBar") }
+    }
+    
+    @Published public var showCPUInMenuBar: Bool {
+        didSet { UserDefaults.standard.set(showCPUInMenuBar, forKey: "pref_showCPU") }
+    }
+    @Published public var showCPUSparkline: Bool {
+        didSet { UserDefaults.standard.set(showCPUSparkline, forKey: "pref_showCPUSparkline") }
+    }
+    
+    @Published public var showMemoryInMenuBar: Bool {
+        didSet { UserDefaults.standard.set(showMemoryInMenuBar, forKey: "pref_showMemory") }
+    }
+    @Published public var showMemorySparkline: Bool {
+        didSet { UserDefaults.standard.set(showMemorySparkline, forKey: "pref_showMemorySparkline") }
+    }
+    
+    @Published public var showDiskInMenuBar: Bool {
+        didSet { UserDefaults.standard.set(showDiskInMenuBar, forKey: "pref_showDisk") }
+    }
+    @Published public var diskDisplayMode: DiskDisplayMode {
+        didSet { UserDefaults.standard.set(diskDisplayMode.rawValue, forKey: "pref_diskDisplayMode") }
+    }
+    
+    @Published public var showNetworkInMenuBar: Bool {
+        didSet { UserDefaults.standard.set(showNetworkInMenuBar, forKey: "pref_showNetwork") }
+    }
+    @Published public var networkDisplayMode: NetworkDisplayMode {
+        didSet { UserDefaults.standard.set(networkDisplayMode.rawValue, forKey: "pref_networkDisplayMode") }
+    }
+    
+    @Published public var showBatteryInMenuBar: Bool {
+        didSet { UserDefaults.standard.set(showBatteryInMenuBar, forKey: "pref_showBattery") }
+    }
+    @Published public var showGPUInMenuBar: Bool {
+        didSet { UserDefaults.standard.set(showGPUInMenuBar, forKey: "pref_showGPU") }
+    }
+    @Published public var showSensorInMenuBar: Bool {
+        didSet { UserDefaults.standard.set(showSensorInMenuBar, forKey: "pref_showSensor") }
+    }
     
     // Background Samplers
     private let cpuMonitor = CPUMonitor()
@@ -53,6 +100,39 @@ public final class SystemMonitor: ObservableObject {
     private var timer: Timer?
     
     private init() {
+        // Register defaults
+        let defaults = UserDefaults.standard
+        defaults.register(defaults: [
+            "pref_updateInterval": 1.0,
+            "pref_useCompactHealthBar": false,
+            "pref_showCPU": true,
+            "pref_showCPUSparkline": true,
+            "pref_showMemory": true,
+            "pref_showMemorySparkline": true,
+            "pref_showDisk": true,
+            "pref_diskDisplayMode": DiskDisplayMode.freeSpace.rawValue,
+            "pref_showNetwork": true,
+            "pref_networkDisplayMode": NetworkDisplayMode.stacked.rawValue,
+            "pref_showBattery": true,
+            "pref_showGPU": false,
+            "pref_showSensor": true
+        ])
+        
+        // Load persisted settings
+        self.updateInterval = defaults.double(forKey: "pref_updateInterval")
+        self.useCompactHealthBar = defaults.bool(forKey: "pref_useCompactHealthBar")
+        self.showCPUInMenuBar = defaults.bool(forKey: "pref_showCPU")
+        self.showCPUSparkline = defaults.bool(forKey: "pref_showCPUSparkline")
+        self.showMemoryInMenuBar = defaults.bool(forKey: "pref_showMemory")
+        self.showMemorySparkline = defaults.bool(forKey: "pref_showMemorySparkline")
+        self.showDiskInMenuBar = defaults.bool(forKey: "pref_showDisk")
+        self.diskDisplayMode = DiskDisplayMode(rawValue: defaults.string(forKey: "pref_diskDisplayMode") ?? "") ?? .freeSpace
+        self.showNetworkInMenuBar = defaults.bool(forKey: "pref_showNetwork")
+        self.networkDisplayMode = NetworkDisplayMode(rawValue: defaults.string(forKey: "pref_networkDisplayMode") ?? "") ?? .stacked
+        self.showBatteryInMenuBar = defaults.bool(forKey: "pref_showBattery")
+        self.showGPUInMenuBar = defaults.bool(forKey: "pref_showGPU")
+        self.showSensorInMenuBar = defaults.bool(forKey: "pref_showSensor")
+        
         // Initial sample
         refreshAll()
         startTimer()
@@ -60,7 +140,8 @@ public final class SystemMonitor: ObservableObject {
     
     public func startTimer() {
         timer?.invalidate()
-        timer = Timer.scheduledTimer(withTimeInterval: updateInterval, repeats: true) { [weak self] _ in
+        let interval = max(0.2, updateInterval)
+        timer = Timer.scheduledTimer(withTimeInterval: interval, repeats: true) { [weak self] _ in
             Task { @MainActor [weak self] in
                 self?.refreshAll()
             }
@@ -130,7 +211,6 @@ public final class SystemMonitor: ObservableObject {
         var deductions: Double = 0.0
         var issues: [String] = []
         
-        // CPU penalty: high usage for extended periods
         if cpu.totalUsage > 85.0 {
             deductions += 15.0
             issues.append("High CPU Load")
@@ -138,7 +218,6 @@ public final class SystemMonitor: ObservableObject {
             deductions += 5.0
         }
         
-        // Memory penalty: RAM usage and pressure
         if memory.pressureLevel == .critical || memory.usagePercentage > 90.0 {
             deductions += 25.0
             issues.append("Memory Pressure Critical")
@@ -147,7 +226,6 @@ public final class SystemMonitor: ObservableObject {
             issues.append("Memory Warning")
         }
         
-        // Thermal pressure penalty
         switch sensors.thermalPressure {
         case .critical:
             deductions += 30.0
@@ -161,7 +239,6 @@ public final class SystemMonitor: ObservableObject {
             break
         }
         
-        // Disk space penalty: if free < 10 GB
         if disk.freeBytes < 10 * 1024 * 1024 * 1024 {
             deductions += 20.0
             issues.append("Disk Space Low")
