@@ -19,9 +19,6 @@ let package = Package(
         .executableTarget(
             name: "Mectrics",
             path: "Sources",
-            resources: [
-                .process("Resources")
-            ],
             swiftSettings: [
                 .enableUpcomingFeature("StrictConcurrency")
             ]
