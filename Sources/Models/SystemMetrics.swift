@@ -11,6 +11,7 @@ public struct CPUMetrics: Sendable {
     public var temperature: Double = 0.0 // Celsius
     public var physicalCores: Int = 8
     public var logicalCores: Int = 8
+    public var busiestCoreUsage: Double = 0.0
     public var modelName: String = "Apple Silicon"
 }
 
@@ -66,6 +67,7 @@ public struct DiskMetrics: Sendable {
     public var totalBytes: UInt64 = 0
     public var usedBytes: UInt64 = 0
     public var freeBytes: UInt64 = 0
+    public var purgeableBytes: UInt64 = 0
     public var usagePercentage: Double = 0.0
     public var readBytesPerSec: Double = 0.0
     public var writeBytesPerSec: Double = 0.0

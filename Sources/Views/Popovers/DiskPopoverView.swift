@@ -1,111 +1,100 @@
 import SwiftUI
+import AppKit
 
 public struct DiskPopoverView: View {
     @ObservedObject var monitor: SystemMonitor
+    @State private var showingSettings = false
+    
+    public init(monitor: SystemMonitor) {
+        self.monitor = monitor
+    }
     
     public var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             // Header
-            HStack {
-                Image(systemName: "internaldrive")
-                    .font(.title2)
-                    .foregroundStyle(.cyan)
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(monitor.disk.volumeName)
-                        .font(.headline)
-                    Text("Primary Storage System • \(monitor.disk.fileSystem)")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+            PopoverHeaderView(
+                icon: "internaldrive",
+                title: "Disk",
+                rightText: String(format: "%.1f%%", monitor.disk.usagePercentage),
+                ringProgress: monitor.disk.usagePercentage / 100.0
+            )
+            
+            // Multi-segment Disk Bar & Legend
+            VStack(alignment: .leading, spacing: 6) {
+                GeometryReader { geo in
+                    let total = max(1, Double(monitor.disk.totalBytes))
+                    let usedWidth = geo.size.width * CGFloat(min(1.0, Double(monitor.disk.usedBytes) / total))
+                    let purgeWidth = geo.size.width * CGFloat(min(1.0, Double(monitor.disk.purgeableBytes) / total))
+                    
+                    ZStack(alignment: .leading) {
+                        // Background (Free)
+                        RoundedRectangle(cornerRadius: 6)
+                            .fill(Color(white: 0.22))
+                        
+                        // Purgeable + Used
+                        RoundedRectangle(cornerRadius: 6)
+                            .fill(MectricsTheme.purgeableColor)
+                            .frame(width: min(geo.size.width, usedWidth + purgeWidth))
+                        
+                        // Used
+                        RoundedRectangle(cornerRadius: 6)
+                            .fill(MectricsTheme.coral)
+                            .frame(width: usedWidth)
+                    }
                 }
-                Spacer()
-                Text(String(format: "%.1f%%", monitor.disk.usagePercentage))
-                    .font(.title2)
-                    .fontWeight(.bold)
-                    .foregroundStyle(.cyan)
+                .frame(height: 12)
+                
+                // Legend
+                HStack(spacing: 12) {
+                    legendItem(color: MectricsTheme.coral, label: "Used")
+                    legendItem(color: MectricsTheme.purgeableColor, label: "Purgeable")
+                    legendItem(color: Color(white: 0.35), label: "Free")
+                }
+                .padding(.top, 2)
             }
             
-            // Storage Capacity Meter
-            SectionCardView(title: "Capacity Breakdown", icon: "chart.bar.fill") {
-                VStack(alignment: .leading, spacing: 6) {
-                    MetricBarView(
-                        label: "Used Space",
-                        valueText: "\(formatBytes(monitor.disk.usedBytes)) of \(formatBytes(monitor.disk.totalBytes))",
-                        progress: monitor.disk.totalBytes > 0 ? Double(monitor.disk.usedBytes) / Double(monitor.disk.totalBytes) : 0,
-                        tintColor: monitor.disk.usagePercentage > 90 ? .red : .cyan,
-                        height: 8
-                    )
-                    
-                    HStack {
-                        Text("Free Available:")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                        Spacer()
-                        Text(formatBytes(monitor.disk.freeBytes))
-                            .font(.caption)
-                            .fontWeight(.semibold)
-                    }
+            // Key-Value List
+            VStack(spacing: 2) {
+                PopoverKeyValueRow(label: "Used", value: formatGB(monitor.disk.usedBytes))
+                PopoverKeyValueRow(label: "Free", value: formatGB(monitor.disk.freeBytes))
+                PopoverKeyValueRow(label: "Purgeable", value: formatGB(monitor.disk.purgeableBytes))
+                PopoverKeyValueRow(label: "Total", value: formatGB(monitor.disk.totalBytes))
+                PopoverKeyValueRow(label: "Read", value: formatRate(monitor.disk.readBytesPerSec))
+                PopoverKeyValueRow(label: "Write", value: formatRate(monitor.disk.writeBytesPerSec))
+            }
+            .padding(.vertical, 2)
+            
+            // Action Button
+            PopoverActionButton(icon: "internaldrive", title: "Open Storage Settings") {
+                if let url = URL(string: "x-apple.systempreferences:com.apple.Storage-Settings.extension") {
+                    NSWorkspace.shared.open(url)
+                } else if let url = URL(string: "x-apple.systempreferences:") {
+                    NSWorkspace.shared.open(url)
                 }
             }
             
-            // Live Read & Write Throughput
-            SectionCardView(title: "Live Disk I/O Throughput", icon: "waveform.path.ecg") {
-                VStack(spacing: 10) {
-                    // Read
-                    VStack(alignment: .leading, spacing: 3) {
-                        HStack {
-                            Text("Read Rate")
-                                .font(.caption2)
-                                .foregroundStyle(.secondary)
-                            Spacer()
-                            Text(formatRate(monitor.disk.readBytesPerSec))
-                                .font(.caption)
-                                .fontWeight(.semibold)
-                                .foregroundStyle(.blue)
-                        }
-                        SparklineView(
-                            values: monitor.diskReadHistory.values,
-                            strokeColor: .blue,
-                            gradientColors: [.blue.opacity(0.35), .blue.opacity(0.05)],
-                            lineWidth: 1.5,
-                            showFill: true,
-                            minScale: 0.0,
-                            maxScale: nil
-                        )
-                        .frame(height: 32)
-                        .background(Color.secondary.opacity(0.05))
-                        .clipShape(RoundedRectangle(cornerRadius: 6))
-                    }
-                    
-                    // Write
-                    VStack(alignment: .leading, spacing: 3) {
-                        HStack {
-                            Text("Write Rate")
-                                .font(.caption2)
-                                .foregroundStyle(.secondary)
-                            Spacer()
-                            Text(formatRate(monitor.disk.writeBytesPerSec))
-                                .font(.caption)
-                                .fontWeight(.semibold)
-                                .foregroundStyle(.orange)
-                        }
-                        SparklineView(
-                            values: monitor.diskWriteHistory.values,
-                            strokeColor: .orange,
-                            gradientColors: [.orange.opacity(0.35), .orange.opacity(0.05)],
-                            lineWidth: 1.5,
-                            showFill: true,
-                            minScale: 0.0,
-                            maxScale: nil
-                        )
-                        .frame(height: 32)
-                        .background(Color.secondary.opacity(0.05))
-                        .clipShape(RoundedRectangle(cornerRadius: 6))
-                    }
-                }
-            }
+            // Footer
+            PopoverFooterView(showingSettings: $showingSettings)
         }
-        .padding(16)
-        .frame(width: 320)
+        .mectricsPopoverStyle()
+        .sheet(isPresented: $showingSettings) {
+            SettingsView(monitor: monitor)
+        }
+    }
+    
+    private func legendItem(color: Color, label: String) -> some View {
+        HStack(spacing: 4) {
+            Circle()
+                .fill(color)
+                .frame(width: 6, height: 6)
+            Text(label)
+                .font(.system(size: 11, weight: .regular))
+                .foregroundStyle(MectricsTheme.textSecondary)
+        }
+    }
+    
+    private func formatGB(_ bytes: UInt64) -> String {
+        return String(format: "%.1f GB", Double(bytes) / (1024 * 1024 * 1024))
     }
     
     private func formatRate(_ bytesPerSec: Double) -> String {
@@ -113,12 +102,5 @@ public struct DiskPopoverView: View {
         formatter.allowedUnits = [.useAll]
         formatter.countStyle = .file
         return "\(formatter.string(fromByteCount: Int64(bytesPerSec)))/s"
-    }
-    
-    private func formatBytes(_ bytes: UInt64) -> String {
-        let formatter = ByteCountFormatter()
-        formatter.allowedUnits = [.useGB, .useTB]
-        formatter.countStyle = .file
-        return formatter.string(fromByteCount: Int64(bytes))
     }
 }

@@ -92,6 +92,7 @@ public final class CPUMonitor: @unchecked Sendable {
             } else {
                 metrics.perCoreUsage = Array(repeating: metrics.totalUsage, count: cpuCount)
             }
+            metrics.busiestCoreUsage = metrics.perCoreUsage.max() ?? metrics.totalUsage
             
             previousPerCoreTicks = currentTicks
             

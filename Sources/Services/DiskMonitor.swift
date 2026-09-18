@@ -21,21 +21,27 @@ public final class DiskMonitor: @unchecked Sendable {
             let rootURL = URL(fileURLWithPath: "/")
             let values = try rootURL.resourceValues(forKeys: [
                 .volumeTotalCapacityKey,
+                .volumeAvailableCapacityKey,
                 .volumeAvailableCapacityForImportantUsageKey,
                 .volumeNameKey
             ])
             
             let total = UInt64(values.volumeTotalCapacity ?? 0)
-            let free = UInt64(values.volumeAvailableCapacityForImportantUsage ?? 0)
-            let used = total >= free ? (total - free) : 0
+            let rawAvailable = UInt64(values.volumeAvailableCapacity ?? 0)
+            let importantAvailable = UInt64(values.volumeAvailableCapacityForImportantUsage ?? 0)
+            
+            let purgeable = importantAvailable > rawAvailable ? (importantAvailable - rawAvailable) : 0
+            let free = rawAvailable > 0 ? rawAvailable : importantAvailable
+            let used = total >= (free + purgeable) ? (total - free - purgeable) : (total >= free ? (total - free) : 0)
             
             metrics.totalBytes = total
             metrics.freeBytes = free
+            metrics.purgeableBytes = purgeable
             metrics.usedBytes = used
             metrics.volumeName = values.volumeName ?? "Macintosh HD"
             
             if total > 0 {
-                metrics.usagePercentage = max(0.0, min(100.0, (Double(used) / Double(total)) * 100.0))
+                metrics.usagePercentage = max(0.0, min(100.0, (Double(total - free) / Double(total)) * 100.0))
             }
         } catch {
             // Fallback via statvfs

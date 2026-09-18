@@ -2,25 +2,22 @@ import SwiftUI
 
 public struct SparklineView: View {
     public let values: [Double]
-    public var strokeColor: Color = .accentColor
-    public var gradientColors: [Color]? = nil
-    public var lineWidth: CGFloat = 1.2
-    public var showFill: Bool = true
-    public var minScale: Double? = 0.0
-    public var maxScale: Double? = 100.0
+    public var strokeColor: Color
+    public var lineWidth: CGFloat
+    public var showFill: Bool
+    public var minScale: Double?
+    public var maxScale: Double?
     
     public init(
         values: [Double],
-        strokeColor: Color = .accentColor,
-        gradientColors: [Color]? = nil,
-        lineWidth: CGFloat = 1.2,
+        strokeColor: Color = MectricsTheme.coral,
+        lineWidth: CGFloat = 1.6,
         showFill: Bool = true,
         minScale: Double? = 0.0,
         maxScale: Double? = 100.0
     ) {
         self.values = values
         self.strokeColor = strokeColor
-        self.gradientColors = gradientColors
         self.lineWidth = lineWidth
         self.showFill = showFill
         self.minScale = minScale
@@ -32,7 +29,7 @@ public struct SparklineView: View {
             guard values.count >= 2 else { return }
             
             let minVal = minScale ?? (values.min() ?? 0.0)
-            let maxVal = max(maxScale ?? (values.max() ?? 100.0), minVal + 0.001)
+            let maxVal = max(maxScale ?? (values.max() ?? 100.0), minVal + 0.01)
             let range = maxVal - minVal
             
             let stepX = size.width / CGFloat(values.count - 1)
@@ -44,7 +41,7 @@ public struct SparklineView: View {
                 let clamped = max(minVal, min(maxVal, val))
                 let normalizedY = 1.0 - CGFloat((clamped - minVal) / range)
                 let x = CGFloat(index) * stepX
-                let y = normalizedY * (size.height - 2) + 1
+                let y = normalizedY * (size.height - 4) + 2
                 
                 if index == 0 {
                     linePath.move(to: CGPoint(x: x, y: y))
@@ -60,9 +57,9 @@ public struct SparklineView: View {
             fillPath.closeSubpath()
             
             if showFill {
-                let grad = Gradient(colors: gradientColors ?? [
+                let grad = Gradient(colors: [
                     strokeColor.opacity(0.35),
-                    strokeColor.opacity(0.05)
+                    strokeColor.opacity(0.02)
                 ])
                 context.fill(
                     fillPath,
@@ -77,7 +74,7 @@ public struct SparklineView: View {
             context.stroke(
                 linePath,
                 with: .color(strokeColor),
-                lineWidth: lineWidth
+                style: StrokeStyle(lineWidth: lineWidth, lineCap: .round, lineJoin: .round)
             )
         }
     }
