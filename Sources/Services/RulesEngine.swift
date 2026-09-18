@@ -22,40 +22,63 @@ public final class RulesEngine: ObservableObject {
            let decoded = try? JSONDecoder().decode([AlertRule].self, from: data) {
             self.rules = decoded
         } else {
-            // Default built-in sensible rules
+            // Default built-in sensible rules matching Image 5
             self.rules = [
                 AlertRule(
-                    name: "High CPU Sustained",
+                    name: "CPU usage above",
                     isEnabled: true,
                     target: .cpuUsage,
                     comparison: .greaterThan,
-                    thresholdValue: 90.0,
-                    sustainedSeconds: 15
+                    thresholdValue: 85.0,
+                    sustainedSeconds: 30
                 ),
                 AlertRule(
-                    name: "Memory Pressure Critical",
-                    isEnabled: true,
+                    name: "Memory usage above",
+                    isEnabled: false,
                     target: .memoryUsage,
                     comparison: .greaterThan,
-                    thresholdValue: 85.0,
-                    sustainedSeconds: 10
+                    thresholdValue: 90.0,
+                    sustainedSeconds: 30
                 ),
                 AlertRule(
-                    name: "Severe Thermal Pressure",
-                    isEnabled: true,
-                    target: .thermalPressure,
-                    comparison: .equals,
-                    thresholdValue: 0.0,
-                    thermalThreshold: "Serious",
-                    sustainedSeconds: 8
-                ),
-                AlertRule(
-                    name: "Low Battery Warning",
-                    isEnabled: true,
+                    name: "Battery charge below",
+                    isEnabled: false,
                     target: .batteryLevel,
                     comparison: .lessThan,
-                    thresholdValue: 15.0,
-                    sustainedSeconds: 5
+                    thresholdValue: 20.0,
+                    sustainedSeconds: 30
+                ),
+                AlertRule(
+                    name: "Disk usage above",
+                    isEnabled: true,
+                    target: .diskUsage,
+                    comparison: .greaterThan,
+                    thresholdValue: 90.0,
+                    sustainedSeconds: 30
+                ),
+                AlertRule(
+                    name: "Free disk space below",
+                    isEnabled: false,
+                    target: .freeDiskSpace,
+                    comparison: .lessThan,
+                    thresholdValue: 20.0,
+                    sustainedSeconds: 30
+                ),
+                AlertRule(
+                    name: "GPU usage above",
+                    isEnabled: false,
+                    target: .gpuUsage,
+                    comparison: .greaterThan,
+                    thresholdValue: 90.0,
+                    sustainedSeconds: 30
+                ),
+                AlertRule(
+                    name: "CPU temperature above",
+                    isEnabled: false,
+                    target: .cpuTemperature,
+                    comparison: .greaterThan,
+                    thresholdValue: 85.0,
+                    sustainedSeconds: 30
                 )
             ]
             saveRules()
@@ -85,17 +108,30 @@ public final class RulesEngine: ObservableObject {
         }
     }
     
+    public func updateRule(id: UUID, threshold: Double, delaySeconds: Int? = nil) {
+        if let index = rules.firstIndex(where: { $0.id == id }) {
+            rules[index].thresholdValue = threshold
+            if let delay = delaySeconds {
+                rules[index].sustainedSeconds = delay
+            }
+            saveRules()
+        }
+    }
+    
     /// Evaluates rules against current system metrics.
     /// Condition must hold for `sustainedSeconds` samples before triggering!
+    /// Cooldown: rests for 15 minutes after alerting.
     public func evaluate(
         cpu: CPUMetrics,
         memory: MemoryMetrics,
         battery: BatteryMetrics,
         disk: DiskMetrics,
         sensor: SensorMetrics,
+        gpu: GPUMetrics,
         sampleInterval: Double
     ) {
         var currentActiveAlerts: [String] = []
+        let now = Date()
         
         for i in 0..<rules.count {
             guard rules[i].isEnabled else {
@@ -111,9 +147,11 @@ public final class RulesEngine: ObservableObject {
             case .cpuUsage:
                 conditionMet = checkNumeric(rules[i].comparison, actual: cpu.totalUsage, target: rules[i].thresholdValue)
                 displayVal = String(format: "%.1f%%", cpu.totalUsage)
+                
             case .memoryUsage:
                 conditionMet = checkNumeric(rules[i].comparison, actual: memory.usagePercentage, target: rules[i].thresholdValue)
                 displayVal = String(format: "%.1f%%", memory.usagePercentage)
+                
             case .batteryLevel:
                 if battery.isPresent && !battery.isPluggedIn {
                     conditionMet = checkNumeric(rules[i].comparison, actual: battery.percentage, target: rules[i].thresholdValue)
@@ -122,12 +160,24 @@ public final class RulesEngine: ObservableObject {
                     conditionMet = false
                     displayVal = "N/A"
                 }
+                
             case .diskUsage:
                 conditionMet = checkNumeric(rules[i].comparison, actual: disk.usagePercentage, target: rules[i].thresholdValue)
                 displayVal = String(format: "%.1f%%", disk.usagePercentage)
+                
+            case .freeDiskSpace:
+                let freeGB = Double(disk.freeBytes) / (1024 * 1024 * 1024)
+                conditionMet = checkNumeric(rules[i].comparison, actual: freeGB, target: rules[i].thresholdValue)
+                displayVal = String(format: "%.1f GB", freeGB)
+                
+            case .gpuUsage:
+                conditionMet = checkNumeric(rules[i].comparison, actual: gpu.usagePercentage, target: rules[i].thresholdValue)
+                displayVal = String(format: "%.1f%%", gpu.usagePercentage)
+                
             case .cpuTemperature:
                 conditionMet = checkNumeric(rules[i].comparison, actual: sensor.cpuTemperature, target: rules[i].thresholdValue)
                 displayVal = String(format: "%.1f°C", sensor.cpuTemperature)
+                
             case .thermalPressure:
                 let actual = sensor.thermalPressure.rawValue
                 conditionMet = (actual == rules[i].thermalThreshold) ||
@@ -140,12 +190,20 @@ public final class RulesEngine: ObservableObject {
             if conditionMet {
                 rules[i].consecutiveHits += 1
                 if rules[i].consecutiveHits >= requiredHits {
-                    if !rules[i].isTriggered {
+                    // Check cooldown (rests for 15 minutes)
+                    let shouldDispatch: Bool
+                    if let lastTrigger = rules[i].lastTriggeredDate {
+                        shouldDispatch = now.timeIntervalSince(lastTrigger) >= 15 * 60
+                    } else {
+                        shouldDispatch = true
+                    }
+                    
+                    if shouldDispatch && !rules[i].isTriggered {
                         rules[i].isTriggered = true
-                        rules[i].lastTriggeredDate = Date()
+                        rules[i].lastTriggeredDate = now
                         dispatchNotification(rule: rules[i], currentValue: displayVal)
                     }
-                    currentActiveAlerts.append("\(rules[i].name) (\(displayVal))")
+                    currentActiveAlerts.append("\(rules[i].target.rawValue) (\(displayVal))")
                 }
             } else {
                 rules[i].consecutiveHits = 0

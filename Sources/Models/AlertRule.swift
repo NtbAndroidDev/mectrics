@@ -1,14 +1,29 @@
 import Foundation
 
 public enum RuleMetricTarget: String, CaseIterable, Identifiable, Codable, Sendable {
-    case cpuUsage = "CPU Usage (%)"
-    case memoryUsage = "Memory Usage (%)"
-    case batteryLevel = "Battery Level (%)"
-    case diskUsage = "Disk Usage (%)"
-    case cpuTemperature = "CPU Temperature (°C)"
+    case cpuUsage = "CPU usage above"
+    case memoryUsage = "Memory usage above"
+    case batteryLevel = "Battery charge below"
+    case diskUsage = "Disk usage above"
+    case freeDiskSpace = "Free disk space below"
+    case gpuUsage = "GPU usage above"
+    case cpuTemperature = "CPU temperature above"
     case thermalPressure = "macOS Thermal Pressure"
     
     public var id: String { rawValue }
+    
+    public var defaultUnit: String {
+        switch self {
+        case .cpuUsage, .memoryUsage, .batteryLevel, .diskUsage, .gpuUsage:
+            return "%"
+        case .freeDiskSpace:
+            return "GB"
+        case .cpuTemperature:
+            return "°C"
+        case .thermalPressure:
+            return ""
+        }
+    }
 }
 
 public enum RuleOperator: String, CaseIterable, Identifiable, Codable, Sendable {
@@ -27,7 +42,7 @@ public struct AlertRule: Identifiable, Codable, Sendable {
     public var comparison: RuleOperator
     public var thresholdValue: Double
     public var thermalThreshold: String // Used if target == .thermalPressure
-    /// Condition must hold for this duration (in seconds or samples) before speaking up
+    /// Condition must hold for this duration (in seconds) before speaking up
     public var sustainedSeconds: Int
     
     // Runtime transient state
@@ -43,7 +58,7 @@ public struct AlertRule: Identifiable, Codable, Sendable {
         comparison: RuleOperator = .greaterThan,
         thresholdValue: Double,
         thermalThreshold: String = "Serious",
-        sustainedSeconds: Int = 10,
+        sustainedSeconds: Int = 30,
         consecutiveHits: Int = 0,
         isTriggered: Bool = false,
         lastTriggeredDate: Date? = nil

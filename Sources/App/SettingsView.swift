@@ -20,8 +20,11 @@ public enum SettingsTab: String, CaseIterable, Identifiable {
 
 public struct SettingsView: View {
     @ObservedObject var monitor: SystemMonitor
-    @State private var selectedTab: SettingsTab = .alerts
+    @State private var selectedTab: SettingsTab
     @Environment(\.dismiss) private var dismiss
+    
+    // Launch at login state
+    @State private var launchAtLogin: Bool = LaunchAtLoginManager.isEnabled
     
     // Configurable Rules
     @AppStorage("rule_cpu_enabled") private var cpuRuleEnabled = true
@@ -49,10 +52,11 @@ public struct SettingsView: View {
     @AppStorage("rule_temp_enabled") private var tempRuleEnabled = false
     @AppStorage("rule_temp_thresh") private var tempRuleThresh = 85
     
-    @State private var notificationStatusText = ""
+    @State private var testNotificationSent = false
     
-    public init(monitor: SystemMonitor) {
+    public init(monitor: SystemMonitor, initialTab: SettingsTab = .alerts) {
         self.monitor = monitor
+        self._selectedTab = State(initialValue: initialTab)
     }
     
     public var body: some View {
@@ -109,9 +113,12 @@ public struct SettingsView: View {
                 .padding(20)
             }
         }
-        .frame(width: 520, height: 600)
+        .frame(width: 530, height: 620)
         .background(Color(red: 0.11, green: 0.11, blue: 0.12))
         .preferredColorScheme(.dark)
+        .onAppear {
+            syncRulesToEngine()
+        }
     }
     
     // MARK: - Alerts Tab (Matches Reference Image 5)
@@ -226,8 +233,12 @@ public struct SettingsView: View {
                     .buttonStyle(.bordered)
                     .tint(.white)
                     
-                    Button("Send a Test Notification") {
+                    Button(testNotificationSent ? "Notification Sent!" : "Send a Test Notification") {
                         sendTestNotification()
+                        testNotificationSent = true
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) {
+                            testNotificationSent = false
+                        }
                     }
                     .buttonStyle(.bordered)
                     .tint(.white)
@@ -258,9 +269,11 @@ public struct SettingsView: View {
                 
                 // Stepper / Value
                 Menu {
-                    ForEach([10, 20, 30, 40, 50, 60, 70, 80, 85, 90, 95], id: \.self) { v in
+                    let choices = (unit == "GB") ? [5, 10, 15, 20, 30, 50, 100] : [10, 20, 30, 40, 50, 60, 70, 75, 80, 85, 90, 95]
+                    ForEach(choices, id: \.self) { v in
                         Button("\(v)\(unit)") {
                             value.wrappedValue = v
+                            syncRulesToEngine()
                         }
                     }
                 } label: {
@@ -281,6 +294,9 @@ public struct SettingsView: View {
                 Toggle("", isOn: isOn)
                     .labelsHidden()
                     .toggleStyle(SwitchToggleStyle(tint: .blue))
+                    .onChange(of: isOn.wrappedValue) { _ in
+                        syncRulesToEngine()
+                    }
             }
             
             if isOn.wrappedValue {
@@ -297,9 +313,18 @@ public struct SettingsView: View {
                     
                     if let delay = delaySeconds {
                         Menu {
-                            Button("Alert after 10 seconds") { delay.wrappedValue = 10 }
-                            Button("Alert after 30 seconds") { delay.wrappedValue = 30 }
-                            Button("Alert after 60 seconds") { delay.wrappedValue = 60 }
+                            Button("Alert after 10 seconds") {
+                                delay.wrappedValue = 10
+                                syncRulesToEngine()
+                            }
+                            Button("Alert after 30 seconds") {
+                                delay.wrappedValue = 30
+                                syncRulesToEngine()
+                            }
+                            Button("Alert after 60 seconds") {
+                                delay.wrappedValue = 60
+                                syncRulesToEngine()
+                            }
                         } label: {
                             HStack(spacing: 3) {
                                 Text("Alert after \(delay.wrappedValue) seconds")
@@ -320,40 +345,123 @@ public struct SettingsView: View {
     
     // MARK: - Menu Bar Tab
     private var menuBarTabContent: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            Text("Menu Bar Items")
-                .font(.system(size: 13, weight: .bold))
-                .foregroundStyle(.white)
-            
-            VStack(spacing: 10) {
-                Toggle("Compact Health Bar (Single Slot)", isOn: $monitor.useCompactHealthBar)
+        VStack(alignment: .leading, spacing: 18) {
+            // Live Preview Card
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Live Menu Bar Preview")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(MectricsTheme.textSecondary)
                 
-                if !monitor.useCompactHealthBar {
-                    Toggle("Disk Available Space", isOn: $monitor.showDiskInMenuBar)
-                    Toggle("Memory Usage & Sparkline", isOn: $monitor.showMemoryInMenuBar)
-                    Toggle("CPU Usage & Live Waveform", isOn: $monitor.showCPUInMenuBar)
-                    Toggle("Network Inbound / Outbound", isOn: $monitor.showNetworkInMenuBar)
-                    Toggle("Battery Status", isOn: $monitor.showBatteryInMenuBar)
-                    Toggle("GPU Graphics Utilization", isOn: $monitor.showGPUInMenuBar)
-                    Toggle("Sensor & Thermal Pressure", isOn: $monitor.showSensorInMenuBar)
+                HStack(spacing: 12) {
+                    if monitor.useCompactHealthBar {
+                        Image(systemName: "checkmark.shield")
+                            .foregroundStyle(MectricsTheme.coral)
+                    } else {
+                        if monitor.showDiskInMenuBar {
+                            HStack(spacing: 3) {
+                                Image(systemName: "internaldrive")
+                                    .foregroundStyle(MectricsTheme.coral)
+                                Text("\(monitor.disk.freeBytes / (1024*1024*1024))GB")
+                                    .font(.system(size: 11, weight: .semibold, design: .monospaced))
+                            }
+                        }
+                        if monitor.showMemoryInMenuBar {
+                            HStack(spacing: 3) {
+                                Image(systemName: "memorychip")
+                                    .foregroundStyle(MectricsTheme.coral)
+                                Text(String(format: "%.0f%%", monitor.memory.usagePercentage))
+                                    .font(.system(size: 11, weight: .semibold, design: .monospaced))
+                            }
+                        }
+                        if monitor.showCPUInMenuBar {
+                            HStack(spacing: 3) {
+                                Image(systemName: "cpu")
+                                    .foregroundStyle(MectricsTheme.coral)
+                                Text(String(format: "%.0f%%", monitor.cpu.totalUsage))
+                                    .font(.system(size: 11, weight: .semibold, design: .monospaced))
+                            }
+                        }
+                        if monitor.showNetworkInMenuBar {
+                            HStack(spacing: 3) {
+                                Image(systemName: "arrow.up.arrow.down")
+                                    .foregroundStyle(MectricsTheme.coral)
+                                Text("↓1.0K ↑1.0K")
+                                    .font(.system(size: 9, weight: .semibold, design: .monospaced))
+                            }
+                        }
+                    }
                 }
+                .padding(.horizontal, 14)
+                .padding(.vertical, 8)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(Color.black.opacity(0.6))
+                .clipShape(RoundedRectangle(cornerRadius: 6))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 6)
+                        .stroke(Color.white.opacity(0.1), lineWidth: 1)
+                )
+            }
+            
+            VStack(alignment: .leading, spacing: 12) {
+                Text("Display Mode")
+                    .font(.system(size: 13, weight: .bold))
+                    .foregroundStyle(.white)
+                
+                Toggle("Compact Health Bar (Single Slot)", isOn: $monitor.useCompactHealthBar)
+                    .help("Folds all hardware meters into a single shield icon to save menu bar space.")
             }
             .padding()
             .background(Color.white.opacity(0.04))
             .clipShape(RoundedRectangle(cornerRadius: 8))
+            
+            if !monitor.useCompactHealthBar {
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("Individual Item Visibility")
+                        .font(.system(size: 13, weight: .bold))
+                        .foregroundStyle(.white)
+                    
+                    Toggle("Disk Free Space", isOn: $monitor.showDiskInMenuBar)
+                    Toggle("Memory Usage & Sparkline Box", isOn: $monitor.showMemoryInMenuBar)
+                    Toggle("CPU Usage & Live Waveform", isOn: $monitor.showCPUInMenuBar)
+                    Toggle("Network Inbound / Outbound", isOn: $monitor.showNetworkInMenuBar)
+                    Toggle("Battery Status", isOn: $monitor.showBatteryInMenuBar)
+                    Toggle("GPU Graphics Utilization", isOn: $monitor.showGPUInMenuBar)
+                    Toggle("Sensors & Thermal Pressure", isOn: $monitor.showSensorInMenuBar)
+                }
+                .padding()
+                .background(Color.white.opacity(0.04))
+                .clipShape(RoundedRectangle(cornerRadius: 8))
+            }
         }
     }
     
     // MARK: - General Tab
     private var generalTabContent: some View {
         VStack(alignment: .leading, spacing: 16) {
-            Text("General Preferences")
-                .font(.system(size: 13, weight: .bold))
-                .foregroundStyle(.white)
-            
+            // System Startup
             VStack(alignment: .leading, spacing: 12) {
+                Text("Startup")
+                    .font(.system(size: 13, weight: .bold))
+                    .foregroundStyle(.white)
+                
+                Toggle("Launch Mectrics automatically at login", isOn: $launchAtLogin)
+                    .onChange(of: launchAtLogin) { newValue in
+                        LaunchAtLoginManager.isEnabled = newValue
+                    }
+            }
+            .padding()
+            .background(Color.white.opacity(0.04))
+            .clipShape(RoundedRectangle(cornerRadius: 8))
+            
+            // Performance & Sampling
+            VStack(alignment: .leading, spacing: 12) {
+                Text("Performance & Polling")
+                    .font(.system(size: 13, weight: .bold))
+                    .foregroundStyle(.white)
+                
                 HStack {
-                    Text("Sampling Interval:")
+                    Text("Hardware Refresh Rate:")
+                        .font(.system(size: 12))
                     Spacer()
                     Picker("", selection: $monitor.updateInterval) {
                         Text("500ms (High precision)").tag(0.5)
@@ -361,28 +469,61 @@ public struct SettingsView: View {
                         Text("2.0s (Battery efficient)").tag(2.0)
                         Text("5.0s (Minimal)").tag(5.0)
                     }
-                    .frame(width: 180)
+                    .frame(width: 190)
                 }
             }
             .padding()
             .background(Color.white.opacity(0.04))
             .clipShape(RoundedRectangle(cornerRadius: 8))
             
-            VStack(alignment: .leading, spacing: 6) {
+            // Privacy & Security
+            VStack(alignment: .leading, spacing: 8) {
                 HStack {
                     Image(systemName: "checkmark.shield.fill")
                         .foregroundStyle(MectricsTheme.coral)
-                    Text("Zero Network Requests")
+                    Text("Zero Network Requests Guarantee")
                         .font(.system(size: 12, weight: .bold))
                 }
-                Text("Mectrics operates entirely locally through macOS Darwin Mach, sysctl, and IOKit. No data ever leaves your computer.")
+                Text("Mectrics operates 100% offline using Darwin Mach kernel, sysctl, and IOKit APIs. No telemetry, crash reporting, or network sockets are ever opened.")
                     .font(.system(size: 11))
                     .foregroundStyle(MectricsTheme.textSecondary)
             }
             .padding()
             .background(Color.white.opacity(0.03))
             .clipShape(RoundedRectangle(cornerRadius: 8))
+            
+            // About
+            VStack(alignment: .leading, spacing: 6) {
+                HStack {
+                    Text("Mectrics v1.0.0")
+                        .font(.system(size: 12, weight: .semibold))
+                    Spacer()
+                    Text("macOS 15+ Native")
+                        .font(.system(size: 11))
+                        .foregroundStyle(MectricsTheme.textTertiary)
+                }
+                Text("Designed natively with Swift 6 and SwiftUI. Free and open source.")
+                    .font(.system(size: 11))
+                    .foregroundStyle(MectricsTheme.textSecondary)
+            }
+            .padding()
+            .background(Color.white.opacity(0.02))
+            .clipShape(RoundedRectangle(cornerRadius: 8))
         }
+    }
+    
+    private func syncRulesToEngine() {
+        var newRules: [AlertRule] = []
+        newRules.append(AlertRule(name: "CPU usage above", isEnabled: cpuRuleEnabled, target: .cpuUsage, comparison: .greaterThan, thresholdValue: Double(cpuRuleThresh), sustainedSeconds: cpuRuleDelay))
+        newRules.append(AlertRule(name: "Memory usage above", isEnabled: memRuleEnabled, target: .memoryUsage, comparison: .greaterThan, thresholdValue: Double(memRuleThresh), sustainedSeconds: memRuleDelay))
+        newRules.append(AlertRule(name: "Battery charge below", isEnabled: batRuleEnabled, target: .batteryLevel, comparison: .lessThan, thresholdValue: Double(batRuleThresh), sustainedSeconds: batRuleDelay))
+        newRules.append(AlertRule(name: "Disk usage above", isEnabled: diskRuleEnabled, target: .diskUsage, comparison: .greaterThan, thresholdValue: Double(diskRuleThresh), sustainedSeconds: diskRuleDelay))
+        newRules.append(AlertRule(name: "Free disk space below", isEnabled: diskFreeRuleEnabled, target: .freeDiskSpace, comparison: .lessThan, thresholdValue: Double(diskFreeRuleThresh), sustainedSeconds: 30))
+        newRules.append(AlertRule(name: "GPU usage above", isEnabled: gpuRuleEnabled, target: .gpuUsage, comparison: .greaterThan, thresholdValue: Double(gpuRuleThresh), sustainedSeconds: 30))
+        newRules.append(AlertRule(name: "CPU temperature above", isEnabled: tempRuleEnabled, target: .cpuTemperature, comparison: .greaterThan, thresholdValue: Double(tempRuleThresh), sustainedSeconds: 30))
+        
+        monitor.rulesEngine.rules = newRules
+        monitor.rulesEngine.saveRules()
     }
     
     private func sendTestNotification() {

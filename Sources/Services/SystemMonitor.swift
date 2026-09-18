@@ -115,6 +115,7 @@ public final class SystemMonitor: ObservableObject {
             battery: newBat,
             disk: newDisk,
             sensor: newSensors,
+            gpu: newGPU,
             sampleInterval: updateInterval
         )
     }

@@ -11,4 +11,8 @@ public final class AppState: ObservableObject {
         // Set activation policy to accessory so it does not crowd the Dock
         NSApplication.shared.setActivationPolicy(.accessory)
     }
+    
+    public func openSettings(tab: SettingsTab = .alerts) {
+        SettingsWindowController.shared.show(tab: tab)
+    }
 }

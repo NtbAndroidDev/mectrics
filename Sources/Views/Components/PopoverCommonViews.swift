@@ -131,16 +131,12 @@ public struct PopoverActionButton: View {
 }
 
 public struct PopoverFooterView: View {
-    @Binding var showingSettings: Bool
-    
-    public init(showingSettings: Binding<Bool>) {
-        self._showingSettings = showingSettings
-    }
+    public init(showingSettings: Binding<Bool>? = nil) {}
     
     public var body: some View {
         HStack {
             Button {
-                showingSettings = true
+                AppState.shared.openSettings(tab: .alerts)
             } label: {
                 HStack(spacing: 4) {
                     Image(systemName: "gearshape")
