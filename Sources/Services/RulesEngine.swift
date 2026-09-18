@@ -14,7 +14,10 @@ public final class RulesEngine: ObservableObject {
     }
     
     public func requestNotificationPermission() {
-        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound, .badge]) { _, _ in }
+        guard Bundle.main.bundleIdentifier != nil else { return }
+        DispatchQueue.main.async {
+            UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound, .badge]) { _, _ in }
+        }
     }
     
     public func loadRules() {

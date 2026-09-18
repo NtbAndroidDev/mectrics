@@ -58,7 +58,7 @@ public struct CompactHealthPopoverView: View {
             // Action Buttons
             VStack(spacing: 8) {
                 PopoverActionButton(icon: "list.bullet.rectangle", title: "Open Attention Log") {
-                    showingAttentionLog = true
+                    AppState.shared.openAttentionLog()
                 }
                 
                 PopoverActionButton(icon: "doc.on.doc", title: copiedSummaryAlert ? "Summary Copied!" : "Copy System Summary") {
