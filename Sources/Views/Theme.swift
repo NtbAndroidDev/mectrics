@@ -8,7 +8,7 @@ public enum MectricsTheme {
     public static let purgeableColor = Color(red: 0.60, green: 0.25, blue: 0.32)
     
     /// Backgrounds
-    public static let popoverBackground = Color(red: 0.12, green: 0.12, blue: 0.13).opacity(0.96)
+    public static let popoverBackground = Color.black.opacity(0.20)
     public static let cardBackground = Color.white.opacity(0.04)
     public static let cardBorder = Color.white.opacity(0.08)
     public static let trackBackground = Color(white: 0.22)
@@ -19,21 +19,17 @@ public enum MectricsTheme {
     public static let textTertiary = Color(white: 0.45)
     
     /// Standard Popover Dimensions
-    public static let popoverWidth: CGFloat = 300
-    public static let popoverCornerRadius: CGFloat = 18
+    public static let popoverWidth: CGFloat = 295
+    public static let popoverCornerRadius: CGFloat = 16
 }
 
 public struct PopoverContainerModifier: ViewModifier {
     public func body(content: Content) -> some View {
         content
-            .padding(14)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 14)
             .frame(width: MectricsTheme.popoverWidth)
             .background(MectricsTheme.popoverBackground)
-            .clipShape(RoundedRectangle(cornerRadius: MectricsTheme.popoverCornerRadius))
-            .overlay(
-                RoundedRectangle(cornerRadius: MectricsTheme.popoverCornerRadius)
-                    .stroke(MectricsTheme.cardBorder, lineWidth: 1)
-            )
             .preferredColorScheme(.dark)
     }
 }

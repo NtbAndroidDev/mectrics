@@ -3,17 +3,17 @@ import UserNotifications
 import AppKit
 
 public enum SettingsTab: String, CaseIterable, Identifiable {
-    case menuBar = "Status Bar"
-    case alerts = "Alerts"
     case general = "General"
+    case menuBar = "Menu Bar"
+    case alerts = "Alerts"
     
     public var id: String { rawValue }
     
     public var icon: String {
         switch self {
+        case .general: return "gearshape"
         case .menuBar: return "square.grid.2x2"
         case .alerts: return "bell"
-        case .general: return "gearshape"
         }
     }
 }
@@ -61,39 +61,45 @@ public struct SettingsView: View {
     
     public var body: some View {
         VStack(spacing: 0) {
-            // Window Toolbar
+            // Window Toolbar (Matches Image 5)
             HStack {
                 Text(selectedTab.rawValue)
-                    .font(.system(size: 14, weight: .bold))
+                    .font(.system(size: 15, weight: .bold))
                     .foregroundStyle(.white)
                 
                 Spacer()
                 
-                // Tab switcher pills
-                HStack(spacing: 2) {
+                // Segmented tab switcher buttons
+                HStack(spacing: 4) {
                     ForEach(SettingsTab.allCases) { tab in
+                        let isActive = (selectedTab == tab)
                         Button {
                             selectedTab = tab
+                            SettingsWindowController.shared.updateTitle(tab.rawValue)
                         } label: {
-                            HStack(spacing: 6) {
+                            VStack(spacing: 3) {
                                 Image(systemName: tab.icon)
-                                    .font(.system(size: 11, weight: .medium))
+                                    .font(.system(size: 16, weight: .regular))
+                                    .foregroundStyle(isActive ? Color.blue : MectricsTheme.textSecondary)
                                 Text(tab.rawValue)
-                                    .font(.system(size: 11, weight: .medium))
+                                    .font(.system(size: 10, weight: .regular))
+                                    .foregroundStyle(isActive ? .white : MectricsTheme.textSecondary)
                             }
-                            .padding(.horizontal, 10)
-                            .padding(.vertical, 5)
-                            .background(selectedTab == tab ? Color.white.opacity(0.12) : Color.clear)
+                            .frame(width: 64, height: 44)
+                            .background(isActive ? Color(red: 0.18, green: 0.28, blue: 0.42) : Color.clear)
                             .clipShape(RoundedRectangle(cornerRadius: 6))
-                            .foregroundStyle(selectedTab == tab ? .white : MectricsTheme.textSecondary)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 6)
+                                    .stroke(isActive ? Color.blue.opacity(0.4) : Color.clear, lineWidth: 1)
+                            )
                         }
                         .buttonStyle(.plain)
                     }
                 }
             }
             .padding(.horizontal, 20)
-            .padding(.vertical, 14)
-            .background(Color(white: 0.12))
+            .padding(.vertical, 10)
+            .background(Color(white: 0.13))
             
             Divider()
                 .overlay(Color.white.opacity(0.08))
@@ -118,6 +124,11 @@ public struct SettingsView: View {
         .preferredColorScheme(.dark)
         .onAppear {
             syncRulesToEngine()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("didSelectSettingsTab"))) { notif in
+            if let tab = notif.object as? SettingsTab {
+                selectedTab = tab
+            }
         }
     }
     
@@ -452,7 +463,7 @@ public struct SettingsView: View {
                     .foregroundStyle(MectricsTheme.textTertiary)
             }
             
-            VStack(spacing: 12) {
+            VStack(spacing: 10) {
                 // 1. CPU
                 ruleRow(
                     title: "CPU usage above",
@@ -462,6 +473,8 @@ public struct SettingsView: View {
                     currentText: "Normal · \(String(format: "%.1f%%", monitor.cpu.totalUsage))",
                     delaySeconds: $cpuRuleDelay
                 )
+                
+                Divider().overlay(Color.white.opacity(0.06))
                 
                 // 2. Memory
                 ruleRow(
@@ -473,6 +486,8 @@ public struct SettingsView: View {
                     delaySeconds: $memRuleDelay
                 )
                 
+                Divider().overlay(Color.white.opacity(0.06))
+                
                 // 3. Battery
                 ruleRow(
                     title: "Battery charge below",
@@ -482,6 +497,8 @@ public struct SettingsView: View {
                     currentText: "Normal · \(String(format: "%.0f%%", monitor.battery.percentage))",
                     delaySeconds: $batRuleDelay
                 )
+                
+                Divider().overlay(Color.white.opacity(0.06))
                 
                 // 4. Disk usage
                 ruleRow(
@@ -493,6 +510,8 @@ public struct SettingsView: View {
                     delaySeconds: $diskRuleDelay
                 )
                 
+                Divider().overlay(Color.white.opacity(0.06))
+                
                 // 5. Free disk space
                 ruleRow(
                     title: "Free disk space below",
@@ -502,6 +521,8 @@ public struct SettingsView: View {
                     currentText: "Normal · \(monitor.disk.freeBytes / (1024*1024*1024)) GB",
                     delaySeconds: nil
                 )
+                
+                Divider().overlay(Color.white.opacity(0.06))
                 
                 // 6. GPU usage
                 ruleRow(
@@ -513,6 +534,8 @@ public struct SettingsView: View {
                     delaySeconds: nil
                 )
                 
+                Divider().overlay(Color.white.opacity(0.06))
+                
                 // 7. CPU temperature
                 ruleRow(
                     title: "CPU temperature above",
@@ -523,6 +546,9 @@ public struct SettingsView: View {
                     delaySeconds: nil
                 )
             }
+            .padding(14)
+            .background(Color.white.opacity(0.04))
+            .clipShape(RoundedRectangle(cornerRadius: 8))
             
             // Description paragraph
             Text("When a rule alerts it notifies you, marks the Compact Health item, and is recorded in the Attention Log. A rule rests for 15 minutes after it alerts.")
@@ -610,7 +636,7 @@ public struct SettingsView: View {
                 Toggle("", isOn: isOn)
                     .labelsHidden()
                     .toggleStyle(SwitchToggleStyle(tint: .blue))
-                    .onChange(of: isOn.wrappedValue) { _ in
+                    .onChange(of: isOn.wrappedValue) {
                         syncRulesToEngine()
                     }
             }
@@ -669,7 +695,7 @@ public struct SettingsView: View {
                     .foregroundStyle(.white)
                 
                 Toggle("Launch Mectrics automatically at login", isOn: $launchAtLogin)
-                    .onChange(of: launchAtLogin) { newValue in
+                    .onChange(of: launchAtLogin) { _, newValue in
                         LaunchAtLoginManager.isEnabled = newValue
                     }
             }

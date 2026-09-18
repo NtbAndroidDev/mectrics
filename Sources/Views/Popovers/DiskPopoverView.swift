@@ -3,7 +3,6 @@ import AppKit
 
 public struct DiskPopoverView: View {
     @ObservedObject var monitor: SystemMonitor
-    @State private var showingSettings = false
     
     public init(monitor: SystemMonitor) {
         self.monitor = monitor
@@ -11,7 +10,7 @@ public struct DiskPopoverView: View {
     
     public var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            // Header
+            // Header (Matches Image 3)
             PopoverHeaderView(
                 icon: "internaldrive",
                 title: "Disk",
@@ -20,7 +19,7 @@ public struct DiskPopoverView: View {
             )
             
             // Multi-segment Disk Bar & Legend
-            VStack(alignment: .leading, spacing: 6) {
+            VStack(alignment: .leading, spacing: 8) {
                 GeometryReader { geo in
                     let total = max(1, Double(monitor.disk.totalBytes))
                     let usedWidth = geo.size.width * CGFloat(min(1.0, Double(monitor.disk.usedBytes) / total))
@@ -28,27 +27,28 @@ public struct DiskPopoverView: View {
                     
                     ZStack(alignment: .leading) {
                         // Background (Free)
-                        RoundedRectangle(cornerRadius: 6)
-                            .fill(Color(white: 0.22))
+                        Capsule()
+                            .fill(Color(white: 0.20))
                         
                         // Purgeable + Used
-                        RoundedRectangle(cornerRadius: 6)
-                            .fill(MectricsTheme.purgeableColor)
+                        Capsule()
+                            .fill(Color(red: 0.42, green: 0.18, blue: 0.22))
                             .frame(width: min(geo.size.width, usedWidth + purgeWidth))
                         
                         // Used
-                        RoundedRectangle(cornerRadius: 6)
+                        Capsule()
                             .fill(MectricsTheme.coral)
                             .frame(width: usedWidth)
                     }
                 }
-                .frame(height: 12)
+                .frame(height: 14)
+                .clipShape(Capsule())
                 
                 // Legend
-                HStack(spacing: 12) {
+                HStack(spacing: 14) {
                     legendItem(color: MectricsTheme.coral, label: "Used")
-                    legendItem(color: MectricsTheme.purgeableColor, label: "Purgeable")
-                    legendItem(color: Color(white: 0.35), label: "Free")
+                    legendItem(color: Color(red: 0.42, green: 0.18, blue: 0.22), label: "Purgeable")
+                    legendItem(color: Color(white: 0.45), label: "Free")
                 }
                 .padding(.top, 2)
             }
@@ -74,12 +74,9 @@ public struct DiskPopoverView: View {
             }
             
             // Footer
-            PopoverFooterView(showingSettings: $showingSettings)
+            PopoverFooterView()
         }
         .mectricsPopoverStyle()
-        .sheet(isPresented: $showingSettings) {
-            SettingsView(monitor: monitor)
-        }
     }
     
     private func legendItem(color: Color, label: String) -> some View {

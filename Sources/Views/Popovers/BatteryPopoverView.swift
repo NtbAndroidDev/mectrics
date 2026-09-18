@@ -3,7 +3,6 @@ import AppKit
 
 public struct BatteryPopoverView: View {
     @ObservedObject var monitor: SystemMonitor
-    @State private var showingSettings = false
     
     public init(monitor: SystemMonitor) {
         self.monitor = monitor
@@ -60,11 +59,8 @@ public struct BatteryPopoverView: View {
             }
             
             // Footer
-            PopoverFooterView(showingSettings: $showingSettings)
+            PopoverFooterView()
         }
         .mectricsPopoverStyle()
-        .sheet(isPresented: $showingSettings) {
-            SettingsView(monitor: monitor)
-        }
     }
 }

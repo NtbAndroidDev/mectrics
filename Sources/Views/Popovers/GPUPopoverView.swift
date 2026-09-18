@@ -3,7 +3,6 @@ import AppKit
 
 public struct GPUPopoverView: View {
     @ObservedObject var monitor: SystemMonitor
-    @State private var showingSettings = false
     
     public init(monitor: SystemMonitor) {
         self.monitor = monitor
@@ -50,12 +49,9 @@ public struct GPUPopoverView: View {
             }
             
             // Footer
-            PopoverFooterView(showingSettings: $showingSettings)
+            PopoverFooterView()
         }
         .mectricsPopoverStyle()
-        .sheet(isPresented: $showingSettings) {
-            SettingsView(monitor: monitor)
-        }
     }
     
     private func formatBytes(_ bytes: UInt64) -> String {

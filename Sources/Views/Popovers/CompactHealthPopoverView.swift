@@ -3,8 +3,6 @@ import AppKit
 
 public struct CompactHealthPopoverView: View {
     @ObservedObject var monitor: SystemMonitor
-    @State private var showingSettings = false
-    @State private var showingAttentionLog = false
     @State private var copiedSummaryAlert = false
     
     public init(monitor: SystemMonitor) {
@@ -13,10 +11,11 @@ public struct CompactHealthPopoverView: View {
     
     public var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            // Header
+            // Header (Matches Image 2)
             PopoverHeaderView(
                 icon: "checkmark.shield",
                 title: monitor.rulesEngine.activeAlerts.isEmpty ? "All systems normal" : "Active Alerts",
+                iconColor: monitor.rulesEngine.activeAlerts.isEmpty ? .white : MectricsTheme.coral,
                 onRefresh: {
                     monitor.refreshAll()
                 }
@@ -29,6 +28,9 @@ public struct CompactHealthPopoverView: View {
                 .font(.system(size: 12, weight: .regular))
                 .foregroundStyle(monitor.rulesEngine.activeAlerts.isEmpty ? MectricsTheme.textSecondary : MectricsTheme.coral)
                 .fixedSize(horizontal: false, vertical: true)
+            
+            Divider()
+                .overlay(Color.white.opacity(0.08))
             
             // Status Items
             VStack(spacing: 8) {
@@ -53,7 +55,7 @@ public struct CompactHealthPopoverView: View {
                     value: String(format: "%.0f%%", monitor.disk.usagePercentage)
                 )
             }
-            .padding(.vertical, 4)
+            .padding(.vertical, 2)
             
             // Action Buttons
             VStack(spacing: 8) {
@@ -71,22 +73,16 @@ public struct CompactHealthPopoverView: View {
             }
             
             // Footer
-            PopoverFooterView(showingSettings: $showingSettings)
+            PopoverFooterView()
         }
         .mectricsPopoverStyle()
-        .sheet(isPresented: $showingSettings) {
-            SettingsView(monitor: monitor)
-        }
-        .sheet(isPresented: $showingAttentionLog) {
-            AttentionLogView(rulesEngine: monitor.rulesEngine)
-        }
     }
     
     private func statusRow(icon: String, title: String, value: String) -> some View {
         HStack(spacing: 8) {
             Image(systemName: icon)
                 .font(.system(size: 13, weight: .medium))
-                .foregroundStyle(MectricsTheme.textSecondary)
+                .foregroundStyle(.white)
                 .frame(width: 18)
             
             Text(title)
@@ -96,7 +92,8 @@ public struct CompactHealthPopoverView: View {
             Spacer()
             
             Text(value)
-                .font(.system(size: 13, weight: .medium, design: .monospaced))
+                .font(.system(size: 13, weight: .semibold, design: .monospaced))
+                .monospacedDigit()
                 .foregroundStyle(.white)
         }
     }

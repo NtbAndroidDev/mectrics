@@ -12,6 +12,7 @@ public final class SettingsWindowController: NSObject, NSWindowDelegate {
             existing.title = tab.rawValue
             existing.makeKeyAndOrderFront(nil)
             NSApp.activate(ignoringOtherApps: true)
+            NotificationCenter.default.post(name: Notification.Name("didSelectSettingsTab"), object: tab)
             return
         }
         
@@ -29,6 +30,10 @@ public final class SettingsWindowController: NSObject, NSWindowDelegate {
         self.window = newWindow
         newWindow.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
+    }
+    
+    public func updateTitle(_ title: String) {
+        window?.title = title
     }
     
     public func windowWillClose(_ notification: Notification) {

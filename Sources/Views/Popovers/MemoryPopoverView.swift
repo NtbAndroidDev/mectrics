@@ -3,7 +3,6 @@ import AppKit
 
 public struct MemoryPopoverView: View {
     @ObservedObject var monitor: SystemMonitor
-    @State private var showingSettings = false
     
     public init(monitor: SystemMonitor) {
         self.monitor = monitor
@@ -20,7 +19,7 @@ public struct MemoryPopoverView: View {
             )
             
             // Memory Composition Bar
-            VStack(alignment: .leading, spacing: 6) {
+            VStack(alignment: .leading, spacing: 8) {
                 GeometryReader { geo in
                     let total = max(1, Double(monitor.memory.totalBytes))
                     let appWidth = geo.size.width * CGFloat(min(1.0, Double(monitor.memory.activeBytes) / total))
@@ -29,33 +28,34 @@ public struct MemoryPopoverView: View {
                     
                     ZStack(alignment: .leading) {
                         // Background (Cached + Free)
-                        RoundedRectangle(cornerRadius: 6)
-                            .fill(Color(white: 0.22))
+                        Capsule()
+                            .fill(Color(white: 0.20))
                         
                         // App + Wired + Compressed
-                        RoundedRectangle(cornerRadius: 6)
+                        Capsule()
                             .fill(MectricsTheme.coralDark)
                             .frame(width: min(geo.size.width, appWidth + wiredWidth + compWidth))
                         
                         // App + Wired
-                        RoundedRectangle(cornerRadius: 6)
+                        Capsule()
                             .fill(MectricsTheme.coralMuted)
                             .frame(width: min(geo.size.width, appWidth + wiredWidth))
                         
                         // App Memory
-                        RoundedRectangle(cornerRadius: 6)
+                        Capsule()
                             .fill(MectricsTheme.coral)
                             .frame(width: appWidth)
                     }
                 }
-                .frame(height: 12)
+                .frame(height: 14)
+                .clipShape(Capsule())
                 
                 // Legend
-                HStack(spacing: 10) {
+                HStack(spacing: 12) {
                     legendItem(color: MectricsTheme.coral, label: "App")
                     legendItem(color: MectricsTheme.coralMuted, label: "Wired")
                     legendItem(color: MectricsTheme.coralDark, label: "Compressed")
-                    legendItem(color: Color(white: 0.35), label: "Cached")
+                    legendItem(color: Color(white: 0.45), label: "Cached")
                 }
                 .padding(.top, 2)
             }
@@ -79,12 +79,9 @@ public struct MemoryPopoverView: View {
             }
             
             // Footer
-            PopoverFooterView(showingSettings: $showingSettings)
+            PopoverFooterView()
         }
         .mectricsPopoverStyle()
-        .sheet(isPresented: $showingSettings) {
-            SettingsView(monitor: monitor)
-        }
     }
     
     private func legendItem(color: Color, label: String) -> some View {

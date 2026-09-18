@@ -6,6 +6,7 @@ public struct PopoverHeaderView: View {
     public let title: String
     public var rightText: String? = nil
     public var ringProgress: Double? = nil
+    public var iconColor: Color? = nil
     public var onRefresh: (() -> Void)? = nil
     
     public init(
@@ -13,12 +14,14 @@ public struct PopoverHeaderView: View {
         title: String,
         rightText: String? = nil,
         ringProgress: Double? = nil,
+        iconColor: Color? = nil,
         onRefresh: (() -> Void)? = nil
     ) {
         self.icon = icon
         self.title = title
         self.rightText = rightText
         self.ringProgress = ringProgress
+        self.iconColor = iconColor
         self.onRefresh = onRefresh
     }
     
@@ -27,7 +30,7 @@ public struct PopoverHeaderView: View {
             HStack(spacing: 6) {
                 Image(systemName: icon)
                     .font(.system(size: 15, weight: .semibold))
-                    .foregroundStyle(MectricsTheme.coral)
+                    .foregroundStyle(iconColor ?? MectricsTheme.coral)
                 
                 Text(title)
                     .font(.system(size: 15, weight: .bold))
@@ -109,21 +112,24 @@ public struct PopoverActionButton: View {
     }
     
     public var body: some View {
-        Button(action: action) {
+        Button {
+            StatusBarManager.shared.closeAllPopovers()
+            action()
+        } label: {
             HStack(spacing: 8) {
                 Image(systemName: icon)
-                    .font(.system(size: 12, weight: .semibold))
+                    .font(.system(size: 13, weight: .semibold))
                 Text(title)
-                    .font(.system(size: 12, weight: .medium))
+                    .font(.system(size: 13, weight: .medium))
             }
             .foregroundStyle(.white)
             .frame(maxWidth: .infinity)
-            .frame(height: 32)
-            .background(Color.white.opacity(0.08))
+            .frame(height: 35)
+            .background(Color.white.opacity(0.12))
             .clipShape(RoundedRectangle(cornerRadius: 8))
             .overlay(
                 RoundedRectangle(cornerRadius: 8)
-                    .stroke(Color.white.opacity(0.1), lineWidth: 1)
+                    .stroke(Color.white.opacity(0.08), lineWidth: 0.5)
             )
         }
         .buttonStyle(.plain)
@@ -136,13 +142,15 @@ public struct PopoverFooterView: View {
     public var body: some View {
         HStack {
             Button {
+                StatusBarManager.shared.closeAllPopovers()
                 AppState.shared.openSettings(tab: .menuBar)
             } label: {
-                HStack(spacing: 4) {
+                HStack(spacing: 5) {
                     Image(systemName: "gearshape")
+                        .font(.system(size: 12))
                     Text("Settings")
+                        .font(.system(size: 12, weight: .regular))
                 }
-                .font(.system(size: 11, weight: .medium))
                 .foregroundStyle(MectricsTheme.coral)
             }
             .buttonStyle(.plain)
@@ -152,11 +160,12 @@ public struct PopoverFooterView: View {
             Button {
                 NSApplication.shared.terminate(nil)
             } label: {
-                HStack(spacing: 4) {
+                HStack(spacing: 5) {
                     Image(systemName: "power")
+                        .font(.system(size: 12))
                     Text("Quit")
+                        .font(.system(size: 12, weight: .regular))
                 }
-                .font(.system(size: 11, weight: .medium))
                 .foregroundStyle(MectricsTheme.coral)
             }
             .buttonStyle(.plain)

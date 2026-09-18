@@ -3,7 +3,6 @@ import AppKit
 
 public struct NetworkPopoverView: View {
     @ObservedObject var monitor: SystemMonitor
-    @State private var showingSettings = false
     
     public init(monitor: SystemMonitor) {
         self.monitor = monitor
@@ -82,12 +81,9 @@ public struct NetworkPopoverView: View {
             }
             
             // Footer
-            PopoverFooterView(showingSettings: $showingSettings)
+            PopoverFooterView()
         }
         .mectricsPopoverStyle()
-        .sheet(isPresented: $showingSettings) {
-            SettingsView(monitor: monitor)
-        }
     }
     
     private func formatRate(_ bytesPerSec: Double) -> String {

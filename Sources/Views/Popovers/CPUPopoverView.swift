@@ -3,7 +3,6 @@ import AppKit
 
 public struct CPUPopoverView: View {
     @ObservedObject var monitor: SystemMonitor
-    @State private var showingSettings = false
     @State private var showTopProcesses = false
     
     public init(monitor: SystemMonitor) {
@@ -112,7 +111,7 @@ public struct CPUPopoverView: View {
             }
             
             // Open Activity Monitor Action Button
-            PopoverActionButton(icon: "gauge.with.needle", title: "Open Activity Monitor") {
+            PopoverActionButton(icon: "speedometer", title: "Open Activity Monitor") {
                 if let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.apple.ActivityMonitor") {
                     NSWorkspace.shared.openApplication(at: url, configuration: NSWorkspace.OpenConfiguration())
                 } else {
@@ -122,11 +121,8 @@ public struct CPUPopoverView: View {
             .padding(.top, 2)
             
             // Footer (Settings & Quit)
-            PopoverFooterView(showingSettings: $showingSettings)
+            PopoverFooterView()
         }
         .mectricsPopoverStyle()
-        .sheet(isPresented: $showingSettings) {
-            SettingsView(monitor: monitor)
-        }
     }
 }
