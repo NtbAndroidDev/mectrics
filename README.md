@@ -1,1 +1,147 @@
-# mectrics
+# Mectrics 📊⚡️
+### Ultra-Lightweight, Privacy-First macOS System Monitor with Headless CLI
+
+<p align="center">
+  <img src="assets/mectrics-preview.png" alt="Mectrics Preview Banner" width="850">
+</p>
+
+<p align="center">
+  <a href="#key-features"><img src="https://img.shields.io/badge/Platform-macOS%2014.0%2B%20%7C%2015.0%2B%20(Sequoia)-black?logo=apple" alt="macOS"></a>
+  <a href="#key-features"><img src="https://img.shields.io/badge/Architecture-Apple%20Silicon%20(M1--M4)%20%2B%20Intel-coral" alt="Architecture"></a>
+  <a href="#key-features"><img src="https://img.shields.io/badge/Swift-6.0-orange?logo=swift" alt="Swift 6"></a>
+  <a href="#privacy--offline-guarantee"><img src="https://img.shields.io/badge/Privacy-Zero%20Network%20Requests-emerald?logo=shield" alt="Privacy"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue" alt="License"></a>
+</p>
+
+---
+
+## ⚡ Overview
+
+**Mectrics** is an ultra-fast, native macOS system monitor crafted specifically for modern Apple Silicon and Intel Macs. Built with **Swift 6, SwiftUI, and AppKit**, Mectrics provides real-time visibility into your hardware directly from the menu bar with zero telemetry, zero background network listeners, and minimal CPU footprint.
+
+Whether you need live per-core equalization, precise battery firmware diagnostics (cycles and mAh capacities), fast external drive ejection, or a headless command-line interface for your automated terminal workflows, Mectrics delivers it all in an elegant, glassmorphic interface.
+
+---
+
+## 🌟 Key Features
+
+### 1. 🧠 Apple Silicon Architecture & CPU Monitoring
+* **Performance (P) vs. Efficiency (E) Cores**: Automatic hardware topology detection via Darwin `sysctl`. View per-core equalizer blocks color-coded for E-Cores (cyan/teal) and P-Cores (neon coral).
+* **Live Sparkline Waveform**: Real-time 30-sample rolling waveform graph with peak load indicator.
+* **Top CPU Processes**: Live process tracking with 1-click termination directly from the popover.
+* **Darwin Load Averages & Uptime**: Real-time 1m, 5m, 15m system load tracking and system uptime.
+
+### 2. 🔋 AppleSmartBattery Hardware Firmware Diagnostics
+* **Accurate Cycle Count**: Direct query to `AppleSmartBattery` firmware via IORegistry (no more hardcoded 0 cycles).
+* **True Battery Health %**: Dynamically calculated as `NominalChargeCapacity / DesignCapacity`.
+* **Exact Capacity Tracking**: View Design Capacity (mAh), Full Charge Capacity (mAh), and live Remaining Capacity.
+* **Charger Wattage & Power Draw**: Real-time wattage consumption (Watts) and connected adapter wattage.
+* **Low Power Mode**: Automatic detection and status badge.
+
+### 3. 💾 Disk Volumes & Safe Drive Ejection
+* **Mounted Volume Discovery**: Automatically enumerates all internal APFS containers, external USB drives, and Thunderbolt SSDs.
+* **1-Click Safe Eject**: Eject removable drives directly from the menu bar popover using native macOS disk management.
+* **Dual Disk I/O Sparklines**: Independent read and write throughput waveforms.
+* **APFS Capacity Breakdown**: Differentiates between Used, Purgeable, and Free storage.
+* **One-Click Trash Emptying**: Instant background trash clearing with disk status updates.
+
+### 4. 🌐 Network Intelligence & Wi-Fi Metrics
+* **CoreWLAN Integration**: Live Wi-Fi signal strength (RSSI in dBm) and Link Speed / Transmit Rate (Mbps).
+* **Gateway & Public IP**: Automatic Darwin default gateway resolution and asynchronous public IP lookups.
+* **Dual Inbound / Outbound Sparklines**: Independent graphs for upload and download rates.
+* **1-Click DNS Cache Flush**: Instantly run `dscacheutil -flushcache` and reload `mDNSResponder`.
+* **Live Ping Latency**: Continuous background latency measurements.
+
+### 5. ❄️ AppleSMC Cooling Fans & Thermal Sensors
+* **Physical Fan Speed (RPM)**: Direct SMC register access (`FNum`, `F0Ac`, `F1Ac`) for accurate left and right fan speeds.
+* **Smart Fanless Detection**: Automatically detects fanless Macs (such as MacBook Air) and hides redundant fan slots.
+* **Thermal Pressure States**: Native monitoring of Apple thermal pressure (`Nominal`, `Fair`, `Serious`, `Critical`).
+
+### 6. ☕ Integrated Anti-Sleep (Keep Awake / Caffeinate)
+* Prevent system display and sleep during long downloads, compile tasks, or presentations with a single menu bar toggle.
+* Automatically pauses background polling when your Mac goes to sleep, preserving battery life.
+
+### 7. ⌨️ Headless CLI (`mectrics`)
+Ship system monitoring into scripts, tmux statusbars, and CI/CD environments:
+```bash
+# Health check exit codes (0 = Healthy, 1 = Limit breached, 2 = No rules)
+mectrics check
+
+# Instant complete machine JSON snapshot (CPU, RAM, Battery, Fans, Disks, Network)
+mectrics snapshot --json
+
+# Sensor and hardware coverage diagnostics
+mectrics doctor
+
+# Stream alert activations live
+mectrics alerts watch
+```
+
+### 8. 🎨 Customization & Multilingual
+* **Accent Color Picker**: Choose between Neon Coral, Sapphire Blue, Emerald Green, Electric Purple, Amber Orange, or Graphite.
+* **Bilingual Support**: Fully localized in English and Tiếng Việt.
+* **Temperature Units**: Switch between Celsius (°C) and Fahrenheit (°F).
+* **Audible Alert System**: Optional sound notifications when thresholds are crossed.
+
+---
+
+## 🔒 Privacy & Offline Guarantee
+
+Mectrics is built with an uncompromising commitment to privacy:
+* **Zero Telemetry**: No tracking, analytics, crash-reporting SDKs, or advertising identifiers.
+* **Local APIs Only**: All statistics are gathered strictly via local Darwin Mach kernel (`mach_host`), IOKit, AppleSMC, and `sysctl` APIs.
+* **Open Source**: Full source code is available for auditing and self-compilation.
+
+---
+
+## 🚀 Installation & Building
+
+### Prerequisites
+* macOS 14.0 (Sonoma) or macOS 15.0+ (Sequoia)
+* Xcode 15.0+ or Swift 6.0 Toolchain
+
+### Quick Build & Run (Terminal)
+```bash
+# Clone the repository
+git clone git@github.com:NtbAndroidDev/mectrics.git
+cd mectrics
+
+# Build debug executable
+swift build
+
+# Run application
+swift run
+```
+
+### Build Universal App Bundle
+```bash
+# Run the automated build script
+chmod +x build_app.sh
+./build_app.sh
+```
+This produces `Mectrics.app` in the project root and automatically copies it to `/Applications/Mectrics.app`.
+
+### Link the CLI Tool
+You can install the CLI directly inside **Mectrics Settings → Alerts → Install CLI (`/usr/local/bin/mectrics`)**, or run:
+```bash
+sudo ln -sf /Applications/Mectrics.app/Contents/MacOS/Mectrics /usr/local/bin/mectrics
+```
+
+---
+
+## 🧹 Clean Uninstall
+
+Mectrics respects your system. To completely remove the application and all associated data:
+1. Open **Mectrics Settings → General**.
+2. Click **"Uninstall Mectrics…"**.
+3. Mectrics will automatically unregister Login Items, clean `/usr/local/bin/mectrics`, reset `UserDefaults`, and cleanly terminate.
+
+---
+
+## 📄 License
+
+This project is licensed under the **MIT License** - see the [LICENSE](LICENSE) file for details.
+
+---
+
+<p align="center">Crafted with ❤️ for macOS power users & developers.</p>
