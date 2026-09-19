@@ -1,6 +1,12 @@
 import Foundation
 import Combine
 
+public enum MenuBarDisplayStyle: String, Codable, CaseIterable {
+    case full = "Wide"       // Icon + Text + Sparkline
+    case compact = "Medium"  // Icon + Text (No sparkline)
+    case minimal = "Tiny"    // Text Only (Ultra compact)
+}
+
 public enum DiskDisplayMode: String, Codable, CaseIterable {
     case freeSpace = "Free Space (e.g. 59GB)"
     case percentage = "Used Percentage (e.g. 76%)"
@@ -53,6 +59,14 @@ public final class SystemMonitor: ObservableObject {
     
     @Published public var useCompactHealthBar: Bool {
         didSet { UserDefaults.standard.set(useCompactHealthBar, forKey: "pref_useCompactHealthBar") }
+    }
+    
+    @Published public var showDualStackedMenuBar: Bool {
+        didSet { UserDefaults.standard.set(showDualStackedMenuBar, forKey: "pref_showDualStackedMenuBar") }
+    }
+    
+    @Published public var menuBarDisplayStyle: MenuBarDisplayStyle {
+        didSet { UserDefaults.standard.set(menuBarDisplayStyle.rawValue, forKey: "pref_menuBarDisplayStyle") }
     }
     
     @Published public var showCPUInMenuBar: Bool {
@@ -118,40 +132,42 @@ public final class SystemMonitor: ObservableObject {
     }
     
     // Background Samplers (Injected Clean Architecture Protocols)
-    private let cpuMonitor: CPUMonitoring
-    private let memoryMonitor: MemoryMonitoring
-    private let batteryMonitor: BatteryMonitoring
-    private let networkMonitor: NetworkMonitoring
-    private let diskMonitor: DiskMonitoring
-    private let gpuMonitor: GPUMonitoring
-    private let sensorMonitor: SensorMonitoring
+    public let cpuMonitor: any CPUMonitoring
+    public let memoryMonitor: any MemoryMonitoring
+    public let batteryMonitor: any BatteryMonitoring
+    public let networkMonitor: any NetworkMonitoring
+    public let diskMonitor: any DiskMonitoring
+    public let gpuMonitor: any GPUMonitoring
+    public let sensorMonitor: any SensorMonitoring
     
     private var timer: Timer?
-    private var sampleCycleCount: UInt64 = 0
     private var isPaused: Bool = false
+    private var sampleCycleCount: UInt64 = 0
     
     public init(
-        cpuMonitor: CPUMonitoring = CPUMonitor(),
-        memoryMonitor: MemoryMonitoring = MemoryMonitor(),
-        batteryMonitor: BatteryMonitoring = BatteryMonitor(),
-        networkMonitor: NetworkMonitoring = NetworkMonitor(),
-        diskMonitor: DiskMonitoring = DiskMonitor(),
-        gpuMonitor: GPUMonitoring = GPUMonitor(),
-        sensorMonitor: SensorMonitoring = SensorMonitor()
+        cpuMonitor: (any CPUMonitoring)? = nil,
+        memoryMonitor: (any MemoryMonitoring)? = nil,
+        batteryMonitor: (any BatteryMonitoring)? = nil,
+        networkMonitor: (any NetworkMonitoring)? = nil,
+        diskMonitor: (any DiskMonitoring)? = nil,
+        gpuMonitor: (any GPUMonitoring)? = nil,
+        sensorMonitor: (any SensorMonitoring)? = nil
     ) {
-        self.cpuMonitor = cpuMonitor
-        self.memoryMonitor = memoryMonitor
-        self.batteryMonitor = batteryMonitor
-        self.networkMonitor = networkMonitor
-        self.diskMonitor = diskMonitor
-        self.gpuMonitor = gpuMonitor
-        self.sensorMonitor = sensorMonitor
+        self.cpuMonitor = cpuMonitor ?? CPUMonitor()
+        self.memoryMonitor = memoryMonitor ?? MemoryMonitor()
+        self.batteryMonitor = batteryMonitor ?? BatteryMonitor()
+        self.networkMonitor = networkMonitor ?? NetworkMonitor()
+        self.diskMonitor = diskMonitor ?? DiskMonitor()
+        self.gpuMonitor = gpuMonitor ?? GPUMonitor()
+        self.sensorMonitor = sensorMonitor ?? SensorMonitor()
         
         // Register defaults
         let defaults = UserDefaults.standard
         defaults.register(defaults: [
             "pref_updateInterval": 1.0,
             "pref_useCompactHealthBar": false,
+            "pref_showDualStackedMenuBar": false,
+            "pref_menuBarDisplayStyle": MenuBarDisplayStyle.full.rawValue,
             "pref_showCPU": true,
             "pref_showCPUSparkline": true,
             "pref_showMemory": true,
@@ -171,6 +187,8 @@ public final class SystemMonitor: ObservableObject {
         let savedInterval = defaults.double(forKey: "pref_updateInterval")
         self.updateInterval = savedInterval >= 0.5 ? savedInterval : 1.0
         self.useCompactHealthBar = defaults.bool(forKey: "pref_useCompactHealthBar")
+        self.showDualStackedMenuBar = defaults.bool(forKey: "pref_showDualStackedMenuBar")
+        self.menuBarDisplayStyle = MenuBarDisplayStyle(rawValue: defaults.string(forKey: "pref_menuBarDisplayStyle") ?? "") ?? .full
         self.showCPUInMenuBar = defaults.bool(forKey: "pref_showCPU")
         self.showCPUSparkline = defaults.bool(forKey: "pref_showCPUSparkline")
         self.showMemoryInMenuBar = defaults.bool(forKey: "pref_showMemory")

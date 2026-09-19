@@ -276,12 +276,43 @@ public struct SettingsView: View {
                 )
             }
             
-            // Mode Switcher
-            VStack(alignment: .leading, spacing: 10) {
-                Text(loc("Display Mode"))
+            // Menu Bar Optimization & Display Style
+            VStack(alignment: .leading, spacing: 12) {
+                Text(loc("Menu Bar Optimization"))
                     .font(.system(size: 13, weight: .bold))
                     .foregroundStyle(.white)
                 
+                // 1. Dual Stacked CPU & RAM (Option 1)
+                Toggle(loc("Dual Stacked CPU & RAM (35px Slot)"), isOn: $monitor.showDualStackedMenuBar)
+                    .toggleStyle(SwitchToggleStyle(tint: MectricsTheme.coral))
+                
+                Text(loc("Dual Stacked Note"))
+                    .font(.system(size: 11))
+                    .foregroundStyle(MectricsTheme.textSecondary)
+                
+                Divider().overlay(Color.white.opacity(0.08))
+                
+                // 2. Display Style Selector (Option 2)
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(loc("Item Width & Style"))
+                        .font(.system(size: 11.5, weight: .semibold))
+                        .foregroundStyle(.white)
+                    
+                    Picker("", selection: $monitor.menuBarDisplayStyle) {
+                        ForEach(MenuBarDisplayStyle.allCases, id: \.self) { style in
+                            Text(loc(style.rawValue)).tag(style)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+                    
+                    Text(loc("Display Style Note"))
+                        .font(.system(size: 10.5))
+                        .foregroundStyle(MectricsTheme.textTertiary)
+                }
+                
+                Divider().overlay(Color.white.opacity(0.08))
+                
+                // 3. Compact Health Mode
                 Toggle(loc("Compact Health Mode (Single Shield Slot)"), isOn: $monitor.useCompactHealthBar)
                     .toggleStyle(SwitchToggleStyle(tint: MectricsTheme.coral))
                 

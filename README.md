@@ -77,7 +77,14 @@ mectrics doctor
 mectrics alerts watch
 ```
 
-### 8. 🎨 Customization & Multilingual
+### 8. 📐 Notch & Status Bar Space Optimization (Solving Overcrowding)
+* **All-in-One Dual Stacked Mini Item (35px Slot)**: Consolidates CPU and RAM into a single vertical micro-slot (`35px` width) with dual live bar indicators and numeric percentages. Clicking it reveals the unified **Master Dashboard** popover containing all system vitals (CPU, RAM, Battery, Disk, Network, Thermals, and Quick Actions).
+* **Flexible Display Styles**:
+  * **Wide (~70px)**: Full icon, live waveform sparklines, and numeric values.
+  * **Medium (~45px)**: Clean icon and compact percentage text.
+  * **Tiny (~28px)**: Ultra-compact text-only format saving up to 65% horizontal width—specifically engineered for MacBooks with camera notches.
+
+### 9. 🎨 Customization & Multilingual
 * **Accent Color Picker**: Choose between Neon Coral, Sapphire Blue, Emerald Green, Electric Purple, Amber Orange, or Graphite.
 * **Bilingual Support**: Fully localized in English and Tiếng Việt.
 * **Temperature Units**: Switch between Celsius (°C) and Fahrenheit (°F).

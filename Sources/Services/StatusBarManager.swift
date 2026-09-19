@@ -12,6 +12,7 @@ public final class StatusBarManager: NSObject, NSPopoverDelegate {
     
     // Status Items
     private var compactHealthItem: NSStatusItem!
+    private var dualStackedItem: NSStatusItem!
     private var diskItem: NSStatusItem!
     private var memoryItem: NSStatusItem!
     private var cpuItem: NSStatusItem!
@@ -23,6 +24,7 @@ public final class StatusBarManager: NSObject, NSPopoverDelegate {
     
     // Popovers
     private var compactHealthPopover: NSPopover!
+    private var dualStackedPopover: NSPopover!
     private var diskPopover: NSPopover!
     private var memoryPopover: NSPopover!
     private var cpuPopover: NSPopover!
@@ -34,6 +36,7 @@ public final class StatusBarManager: NSObject, NSPopoverDelegate {
     
     // Hosting Views
     private var compactHealthHosting: NSHostingView<AnyView>?
+    private var dualStackedHosting: NSHostingView<AnyView>?
     private var diskHosting: NSHostingView<AnyView>?
     private var memoryHosting: NSHostingView<AnyView>?
     private var cpuHosting: NSHostingView<AnyView>?
@@ -55,6 +58,9 @@ public final class StatusBarManager: NSObject, NSPopoverDelegate {
     private func setupStatusItems() {
         compactHealthItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         setupButton(compactHealthItem.button, action: #selector(toggleCompactHealth))
+        
+        dualStackedItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
+        setupButton(dualStackedItem.button, action: #selector(toggleDualStacked))
         
         diskItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         setupButton(diskItem.button, action: #selector(toggleDisk))
@@ -90,6 +96,7 @@ public final class StatusBarManager: NSObject, NSPopoverDelegate {
     
     private func setupPopovers() {
         compactHealthPopover = createPopover(contentView: CompactHealthPopoverView(monitor: monitor))
+        dualStackedPopover = createPopover(contentView: MasterDashboardPopoverView(monitor: monitor))
         diskPopover = createPopover(contentView: DiskPopoverView(monitor: monitor))
         memoryPopover = createPopover(contentView: MemoryPopoverView(monitor: monitor))
         cpuPopover = createPopover(contentView: CPUPopoverView(monitor: monitor))
@@ -130,6 +137,7 @@ public final class StatusBarManager: NSObject, NSPopoverDelegate {
         let compact = monitor.useCompactHealthBar
         
         compactHealthItem.isVisible = compact
+        dualStackedItem.isVisible = !compact && monitor.showDualStackedMenuBar
         diskItem.isVisible = !compact && monitor.showDiskInMenuBar
         memoryItem.isVisible = !compact && monitor.showMemoryInMenuBar
         cpuItem.isVisible = !compact && monitor.showCPUInMenuBar
@@ -142,6 +150,7 @@ public final class StatusBarManager: NSObject, NSPopoverDelegate {
     
     public func updateAllViews() {
         let compact = monitor.useCompactHealthBar
+        let style = monitor.menuBarDisplayStyle
         
         // 1. Compact Health View
         if compact {
@@ -153,7 +162,20 @@ public final class StatusBarManager: NSObject, NSPopoverDelegate {
             return
         }
         
-        // 2. Disk View
+        // 2. Dual Stacked View (CPU & RAM 35px Mini Item)
+        if monitor.showDualStackedMenuBar {
+            let dualActive = (activeStatusItem === dualStackedItem)
+            let dualView = AnyView(
+                DualStackedMenuBarView(
+                    cpuUsage: monitor.cpu.totalUsage,
+                    memUsage: monitor.memory.usagePercentage,
+                    isActive: dualActive
+                )
+            )
+            setHostingView(for: dualStackedItem, hosting: &dualStackedHosting, view: dualView, width: dualActive ? 42 : 36)
+        }
+        
+        // 3. Disk View
         if monitor.showDiskInMenuBar {
             let diskActive = (activeStatusItem === diskItem)
             let diskText = (monitor.diskDisplayMode == .percentage)
@@ -164,13 +186,15 @@ public final class StatusBarManager: NSObject, NSPopoverDelegate {
                     icon: "internaldrive",
                     valueText: diskText,
                     tintColor: MectricsTheme.coral,
+                    displayStyle: style,
                     isActive: diskActive
                 )
             )
-            setHostingView(for: diskItem, hosting: &diskHosting, view: dView, width: diskActive ? 64 : 56)
+            let dWidth: CGFloat = (style == .minimal) ? (diskActive ? 38 : 32) : ((style == .compact) ? (diskActive ? 52 : 46) : (diskActive ? 64 : 56))
+            setHostingView(for: diskItem, hosting: &diskHosting, view: dView, width: dWidth)
         }
         
-        // 3. Memory View
+        // 4. Memory View
         if monitor.showMemoryInMenuBar {
             let memActive = (activeStatusItem === memoryItem)
             let mView = AnyView(
@@ -180,14 +204,17 @@ public final class StatusBarManager: NSObject, NSPopoverDelegate {
                     sparklineValues: monitor.showMemorySparkline ? monitor.memoryHistory.values : nil,
                     isBoxedSparkline: true,
                     tintColor: MectricsTheme.coral,
+                    displayStyle: style,
                     isActive: memActive
                 )
             )
-            let memWidth: CGFloat = monitor.showMemorySparkline ? (memActive ? 82 : 74) : (memActive ? 58 : 50)
+            let memWidth: CGFloat = (style == .minimal) ? (memActive ? 36 : 30) :
+                ((style == .compact) ? (memActive ? 52 : 46) :
+                (monitor.showMemorySparkline ? (memActive ? 82 : 74) : (memActive ? 58 : 50)))
             setHostingView(for: memoryItem, hosting: &memoryHosting, view: mView, width: memWidth)
         }
         
-        // 4. CPU View
+        // 5. CPU View
         if monitor.showCPUInMenuBar {
             let cpuActive = (activeStatusItem === cpuItem)
             let cView = AnyView(
@@ -197,17 +224,21 @@ public final class StatusBarManager: NSObject, NSPopoverDelegate {
                     sparklineValues: monitor.showCPUSparkline ? monitor.cpuHistory.values : nil,
                     isBoxedSparkline: false,
                     tintColor: MectricsTheme.coral,
+                    displayStyle: style,
                     isActive: cpuActive
                 )
             )
-            let cpuWidth: CGFloat = monitor.showCPUSparkline ? (cpuActive ? 86 : 78) : (cpuActive ? 58 : 50)
+            let cpuWidth: CGFloat = (style == .minimal) ? (cpuActive ? 36 : 30) :
+                ((style == .compact) ? (cpuActive ? 52 : 46) :
+                (monitor.showCPUSparkline ? (cpuActive ? 86 : 78) : (cpuActive ? 58 : 50)))
             setHostingView(for: cpuItem, hosting: &cpuHosting, view: cView, width: cpuWidth)
         }
         
-        // 5. Network View
+        // 6. Network View
         if monitor.showNetworkInMenuBar {
             let netActive = (activeStatusItem === networkItem)
             let nView: AnyView
+            let nWidth: CGFloat
             if monitor.networkDisplayMode == .stacked {
                 nView = AnyView(
                     NetworkMenuBarView(
@@ -217,7 +248,7 @@ public final class StatusBarManager: NSObject, NSPopoverDelegate {
                         isActive: netActive
                     )
                 )
-                setHostingView(for: networkItem, hosting: &networkHosting, view: nView, width: netActive ? 66 : 58)
+                nWidth = netActive ? 66 : 58
             } else {
                 let total = monitor.network.downloadBytesPerSec + monitor.network.uploadBytesPerSec
                 nView = AnyView(
@@ -225,14 +256,17 @@ public final class StatusBarManager: NSObject, NSPopoverDelegate {
                         icon: "arrow.up.arrow.down",
                         valueText: formatSingleRate(total),
                         tintColor: MectricsTheme.coral,
+                        displayStyle: style,
                         isActive: netActive
                     )
                 )
-                setHostingView(for: networkItem, hosting: &networkHosting, view: nView, width: netActive ? 70 : 62)
+                nWidth = (style == .minimal) ? (netActive ? 42 : 36) :
+                    ((style == .compact) ? (netActive ? 56 : 48) : (netActive ? 70 : 62))
             }
+            setHostingView(for: networkItem, hosting: &networkHosting, view: nView, width: nWidth)
         }
         
-        // 6. Battery View
+        // 7. Battery View
         if monitor.showBatteryInMenuBar && monitor.battery.isPresent {
             let batActive = (activeStatusItem === batteryItem)
             let bView = AnyView(
@@ -240,13 +274,16 @@ public final class StatusBarManager: NSObject, NSPopoverDelegate {
                     icon: monitor.battery.isCharging ? "battery.100percent.bolt" : "battery.100percent",
                     valueText: String(format: "%.0f%%", monitor.battery.percentage),
                     tintColor: MectricsTheme.coral,
+                    displayStyle: style,
                     isActive: batActive
                 )
             )
-            setHostingView(for: batteryItem, hosting: &batteryHosting, view: bView, width: batActive ? 58 : 50)
+            let bWidth: CGFloat = (style == .minimal) ? (batActive ? 36 : 30) :
+                ((style == .compact) ? (batActive ? 50 : 44) : (batActive ? 58 : 50))
+            setHostingView(for: batteryItem, hosting: &batteryHosting, view: bView, width: bWidth)
         }
         
-        // 7. Sensor View
+        // 8. Sensor View
         if monitor.showSensorInMenuBar {
             let senActive = (activeStatusItem === sensorItem)
             let sView = AnyView(
@@ -255,13 +292,16 @@ public final class StatusBarManager: NSObject, NSPopoverDelegate {
                     valueText: monitor.formatTemperature(monitor.sensor.cpuTemperature),
                     sparklineValues: monitor.tempHistory.values,
                     tintColor: MectricsTheme.coral,
+                    displayStyle: style,
                     isActive: senActive
                 )
             )
-            setHostingView(for: sensorItem, hosting: &sensorHosting, view: sView, width: senActive ? 62 : 54)
+            let sWidth: CGFloat = (style == .minimal) ? (senActive ? 38 : 32) :
+                ((style == .compact) ? (senActive ? 52 : 46) : (senActive ? 62 : 54))
+            setHostingView(for: sensorItem, hosting: &sensorHosting, view: sView, width: sWidth)
         }
         
-        // 8. Fans View
+        // 9. Fans View
         if monitor.showFansInMenuBar && !monitor.sensor.fans.isEmpty {
             let fanActive = (activeStatusItem === fansItem)
             let fastest = monitor.sensor.fans.map(\.currentRPM).max() ?? 0
@@ -271,13 +311,16 @@ public final class StatusBarManager: NSObject, NSPopoverDelegate {
                     icon: "fan.fill",
                     valueText: "\(fanText)R",
                     tintColor: MectricsTheme.coral,
+                    displayStyle: style,
                     isActive: fanActive
                 )
             )
-            setHostingView(for: fansItem, hosting: &fansHosting, view: fView, width: fanActive ? 58 : 50)
+            let fWidth: CGFloat = (style == .minimal) ? (fanActive ? 42 : 36) :
+                ((style == .compact) ? (fanActive ? 52 : 46) : (fanActive ? 58 : 50))
+            setHostingView(for: fansItem, hosting: &fansHosting, view: fView, width: fWidth)
         }
         
-        // 9. GPU View
+        // 10. GPU View
         if monitor.showGPUInMenuBar {
             let gpuActive = (activeStatusItem === gpuItem)
             let gView = AnyView(
@@ -286,10 +329,13 @@ public final class StatusBarManager: NSObject, NSPopoverDelegate {
                     valueText: String(format: "%.0f%%", monitor.gpu.usagePercentage),
                     sparklineValues: monitor.gpuHistory.values,
                     tintColor: MectricsTheme.coral,
+                    displayStyle: style,
                     isActive: gpuActive
                 )
             )
-            setHostingView(for: gpuItem, hosting: &gpuHosting, view: gView, width: gpuActive ? 60 : 52)
+            let gWidth: CGFloat = (style == .minimal) ? (gpuActive ? 36 : 30) :
+                ((style == .compact) ? (gpuActive ? 50 : 44) : (gpuActive ? 60 : 52))
+            setHostingView(for: gpuItem, hosting: &gpuHosting, view: gView, width: gWidth)
         }
     }
     
@@ -333,6 +379,7 @@ public final class StatusBarManager: NSObject, NSPopoverDelegate {
     
     // MARK: - Actions
     @objc private func toggleCompactHealth() { toggle(compactHealthPopover, for: compactHealthItem) }
+    @objc private func toggleDualStacked() { toggle(dualStackedPopover, for: dualStackedItem) }
     @objc private func toggleDisk() { toggle(diskPopover, for: diskItem) }
     @objc private func toggleMemory() { toggle(memoryPopover, for: memoryItem) }
     @objc private func toggleCPU() { toggle(cpuPopover, for: cpuItem) }
@@ -477,7 +524,7 @@ public final class StatusBarManager: NSObject, NSPopoverDelegate {
     }
     
     public func closeAllPopovers() {
-        [compactHealthPopover, diskPopover, memoryPopover, cpuPopover, networkPopover, batteryPopover, sensorPopover, fansPopover, gpuPopover].forEach {
+        [compactHealthPopover, dualStackedPopover, diskPopover, memoryPopover, cpuPopover, networkPopover, batteryPopover, sensorPopover, fansPopover, gpuPopover].forEach {
             $0?.performClose(nil)
         }
     }
