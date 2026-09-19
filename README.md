@@ -200,6 +200,8 @@ If you enjoy using **Mectrics** and it saves you time, consider buying me a coff
   <a href="https://www.buymeacoffee.com/ntb1nh" target="_blank">
     <img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy Me A Coffee" height="48" style="border-radius: 8px;">
   </a>
+  <br><br>
+  ☕ <b>Support link:</b> <a href="https://www.buymeacoffee.com/ntb1nh" target="_blank"><strong>buymeacoffee.com/ntb1nh</strong></a>
 </p>
 
 ---
