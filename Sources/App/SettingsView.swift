@@ -124,7 +124,7 @@ public struct SettingsView: View {
                 .padding(20)
             }
         }
-        .frame(width: 550, height: 640)
+        .frame(minWidth: 520, idealWidth: 580, maxWidth: .infinity, minHeight: 580, idealHeight: 650, maxHeight: .infinity)
         .background(Color(red: 0.11, green: 0.11, blue: 0.12))
         .preferredColorScheme(.dark)
         .onAppear {
@@ -152,164 +152,167 @@ public struct SettingsView: View {
                         .foregroundStyle(MectricsTheme.textTertiary)
                 }
                 
-                HStack(spacing: 14) {
-                    switch monitor.menuBarMode {
-                    case .unified:
-                        HStack(spacing: 6) {
-                            ZStack {
-                                RoundedRectangle(cornerRadius: 3.5)
-                                    .fill(Color(white: 0.18))
-                                    .overlay(
-                                        RoundedRectangle(cornerRadius: 3.5)
-                                            .stroke(Color.white.opacity(0.25), lineWidth: 0.8)
-                                    )
-                                Text("M")
-                                    .font(.system(size: 10, weight: .black, design: .rounded))
-                                    .foregroundStyle(.white)
-                            }
-                            .frame(width: 17, height: 17)
-                            
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 14) {
+                        switch monitor.menuBarMode {
+                        case .unified:
                             HStack(spacing: 6) {
-                                HStack(spacing: 2) {
-                                    Text("CPU")
-                                        .font(.system(size: 10, weight: .regular, design: .monospaced))
-                                        .foregroundStyle(Color.white.opacity(0.75))
-                                    Text(String(format: "%.0f%%", monitor.cpu.totalUsage))
-                                        .font(.system(size: 10.5, weight: .semibold, design: .monospaced))
+                                ZStack {
+                                    RoundedRectangle(cornerRadius: 3.5)
+                                        .fill(Color(white: 0.18))
+                                        .overlay(
+                                            RoundedRectangle(cornerRadius: 3.5)
+                                                .stroke(Color.white.opacity(0.25), lineWidth: 0.8)
+                                        )
+                                    Text("M")
+                                        .font(.system(size: 10, weight: .black, design: .rounded))
                                         .foregroundStyle(.white)
                                 }
-                                HStack(spacing: 2) {
-                                    Text("RAM")
-                                        .font(.system(size: 10, weight: .regular, design: .monospaced))
-                                        .foregroundStyle(Color.white.opacity(0.75))
-                                    Text(String(format: "%.0f%%", monitor.memory.usagePercentage))
-                                        .font(.system(size: 10.5, weight: .semibold, design: .monospaced))
-                                        .foregroundStyle(.white)
-                                }
-                            }
-                        }
-                        
-                    case .dualStacked:
-                        DualStackedMenuBarView(
-                            cpuUsage: monitor.cpu.totalUsage,
-                            memUsage: monitor.memory.usagePercentage
-                        )
-                        
-                    case .compactHealth:
-                        HStack(spacing: 4) {
-                            Image(systemName: "checkmark.shield")
-                                .font(.system(size: 11, weight: .semibold))
-                                .foregroundStyle(MectricsTheme.coral)
-                            Text(loc("All systems normal"))
-                                .font(.system(size: 11, weight: .medium))
-                                .foregroundStyle(.white)
-                        }
-                        
-                    case .separate:
-                        if monitor.showDiskInMenuBar {
-                            HStack(spacing: 4) {
-                                Image(systemName: "internaldrive")
-                                    .font(.system(size: 11, weight: .semibold))
-                                    .foregroundStyle(MectricsTheme.coral)
-                                let diskText = (monitor.diskDisplayMode == .percentage)
-                                    ? String(format: "%.0f%%", monitor.disk.usagePercentage)
-                                    : "\(monitor.disk.freeBytes / (1024*1024*1024))GB"
-                                Text(diskText)
-                                    .font(.system(size: 11, weight: .semibold, design: .monospaced))
-                                    .foregroundStyle(.white)
-                            }
-                        }
-                        if monitor.showMemoryInMenuBar {
-                            HStack(spacing: 4) {
-                                Image(systemName: "memorychip")
-                                    .font(.system(size: 11, weight: .semibold))
-                                    .foregroundStyle(MectricsTheme.coral)
-                                Text(String(format: "%.0f%%", monitor.memory.usagePercentage))
-                                    .font(.system(size: 11, weight: .semibold, design: .monospaced))
-                                    .foregroundStyle(.white)
-                                if monitor.showMemorySparkline {
-                                    RoundedRectangle(cornerRadius: 2)
-                                        .fill(Color(white: 0.2))
-                                        .frame(width: 20, height: 10)
-                                }
-                            }
-                        }
-                        if monitor.showCPUInMenuBar {
-                            HStack(spacing: 4) {
-                                Image(systemName: "cpu")
-                                    .font(.system(size: 11, weight: .semibold))
-                                    .foregroundStyle(MectricsTheme.coral)
-                                Text(String(format: "%.0f%%", monitor.cpu.totalUsage))
-                                    .font(.system(size: 11, weight: .semibold, design: .monospaced))
-                                    .foregroundStyle(.white)
-                                if monitor.showCPUSparkline {
-                                    SparklineView(
-                                        values: monitor.cpuHistory.values,
-                                        strokeColor: MectricsTheme.coral,
-                                        lineWidth: 1.2,
-                                        showFill: false
-                                    )
-                                    .frame(width: 24, height: 10)
-                                }
-                            }
-                        }
-                        if monitor.showNetworkInMenuBar {
-                            HStack(spacing: 4) {
-                                Image(systemName: "arrow.up.arrow.down")
-                                    .font(.system(size: 11, weight: .semibold))
-                                    .foregroundStyle(MectricsTheme.coral)
-                                if monitor.networkDisplayMode == .stacked {
-                                    VStack(alignment: .leading, spacing: -1) {
-                                        Text("↓1.0K").font(.system(size: 8, weight: .semibold, design: .monospaced))
-                                        Text("↑1.0K").font(.system(size: 8, weight: .semibold, design: .monospaced))
+                                .frame(width: 17, height: 17)
+                                
+                                HStack(spacing: 6) {
+                                    HStack(spacing: 2) {
+                                        Text("CPU")
+                                            .font(.system(size: 10, weight: .regular, design: .monospaced))
+                                            .foregroundStyle(Color.white.opacity(0.75))
+                                        Text(String(format: "%.0f%%", monitor.cpu.totalUsage))
+                                            .font(.system(size: 10.5, weight: .semibold, design: .monospaced))
+                                            .foregroundStyle(.white)
                                     }
-                                } else {
-                                    Text("2.0K/s")
-                                        .font(.system(size: 10, weight: .semibold, design: .monospaced))
+                                    HStack(spacing: 2) {
+                                        Text("RAM")
+                                            .font(.system(size: 10, weight: .regular, design: .monospaced))
+                                            .foregroundStyle(Color.white.opacity(0.75))
+                                        Text(String(format: "%.0f%%", monitor.memory.usagePercentage))
+                                            .font(.system(size: 10.5, weight: .semibold, design: .monospaced))
+                                            .foregroundStyle(.white)
+                                    }
                                 }
                             }
-                        }
-                        if monitor.showBatteryInMenuBar && monitor.battery.isPresent {
-                            HStack(spacing: 3) {
-                                Image(systemName: "battery.100percent")
+                            
+                        case .dualStacked:
+                            DualStackedMenuBarView(
+                                cpuUsage: monitor.cpu.totalUsage,
+                                memUsage: monitor.memory.usagePercentage
+                            )
+                            
+                        case .compactHealth:
+                            HStack(spacing: 4) {
+                                Image(systemName: "checkmark.shield")
                                     .font(.system(size: 11, weight: .semibold))
                                     .foregroundStyle(MectricsTheme.coral)
-                                Text(String(format: "%.0f%%", monitor.battery.percentage))
-                                    .font(.system(size: 11, weight: .semibold, design: .monospaced))
+                                Text(loc("All systems normal"))
+                                    .font(.system(size: 11, weight: .medium))
+                                    .foregroundStyle(.white)
                             }
-                        }
-                        if monitor.showSensorInMenuBar {
-                            HStack(spacing: 3) {
-                                Image(systemName: "thermometer.medium")
-                                    .font(.system(size: 11, weight: .semibold))
-                                    .foregroundStyle(MectricsTheme.coral)
-                                Text(monitor.formatTemperature(monitor.sensor.cpuTemperature))
-                                    .font(.system(size: 11, weight: .semibold, design: .monospaced))
+                            
+                        case .separate:
+                            if monitor.showDiskInMenuBar {
+                                HStack(spacing: 4) {
+                                    Image(systemName: "internaldrive")
+                                        .font(.system(size: 11, weight: .semibold))
+                                        .foregroundStyle(MectricsTheme.coral)
+                                    let diskText = (monitor.diskDisplayMode == .percentage)
+                                        ? String(format: "%.0f%%", monitor.disk.usagePercentage)
+                                        : "\(monitor.disk.freeBytes / (1024*1024*1024))GB"
+                                    Text(diskText)
+                                        .font(.system(size: 11, weight: .semibold, design: .monospaced))
+                                        .foregroundStyle(.white)
+                                }
                             }
-                        }
-                        if monitor.showFansInMenuBar && !monitor.sensor.fans.isEmpty {
-                            let fastest = monitor.sensor.fans.map(\.currentRPM).max() ?? 0
-                            HStack(spacing: 3) {
-                                Image(systemName: "fan.fill")
-                                    .font(.system(size: 11, weight: .semibold))
-                                    .foregroundStyle(MectricsTheme.coral)
-                                Text("\(fastest)R")
-                                    .font(.system(size: 11, weight: .semibold, design: .monospaced))
+                            if monitor.showMemoryInMenuBar {
+                                HStack(spacing: 4) {
+                                    Image(systemName: "memorychip")
+                                        .font(.system(size: 11, weight: .semibold))
+                                        .foregroundStyle(MectricsTheme.coral)
+                                    Text(String(format: "%.0f%%", monitor.memory.usagePercentage))
+                                        .font(.system(size: 11, weight: .semibold, design: .monospaced))
+                                        .foregroundStyle(.white)
+                                    if monitor.showMemorySparkline {
+                                        RoundedRectangle(cornerRadius: 2)
+                                            .fill(Color(white: 0.2))
+                                            .frame(width: 20, height: 10)
+                                    }
+                                }
                             }
-                        }
-                        if monitor.showGPUInMenuBar {
-                            HStack(spacing: 3) {
-                                Image(systemName: "display")
-                                    .font(.system(size: 11, weight: .semibold))
-                                    .foregroundStyle(MectricsTheme.coral)
-                                Text(String(format: "%.0f%%", monitor.gpu.usagePercentage))
-                                    .font(.system(size: 11, weight: .semibold, design: .monospaced))
+                            if monitor.showCPUInMenuBar {
+                                HStack(spacing: 4) {
+                                    Image(systemName: "cpu")
+                                        .font(.system(size: 11, weight: .semibold))
+                                        .foregroundStyle(MectricsTheme.coral)
+                                    Text(String(format: "%.0f%%", monitor.cpu.totalUsage))
+                                        .font(.system(size: 11, weight: .semibold, design: .monospaced))
+                                        .foregroundStyle(.white)
+                                    if monitor.showCPUSparkline {
+                                        SparklineView(
+                                            values: monitor.cpuHistory.values,
+                                            strokeColor: MectricsTheme.coral,
+                                            lineWidth: 1.2,
+                                            showFill: false
+                                        )
+                                        .frame(width: 24, height: 10)
+                                    }
+                                }
+                            }
+                            if monitor.showNetworkInMenuBar {
+                                HStack(spacing: 4) {
+                                    Image(systemName: "arrow.up.arrow.down")
+                                        .font(.system(size: 11, weight: .semibold))
+                                        .foregroundStyle(MectricsTheme.coral)
+                                    if monitor.networkDisplayMode == .stacked {
+                                        VStack(alignment: .leading, spacing: -1) {
+                                            Text("↓1.0K").font(.system(size: 8, weight: .semibold, design: .monospaced))
+                                            Text("↑1.0K").font(.system(size: 8, weight: .semibold, design: .monospaced))
+                                        }
+                                    } else {
+                                        Text("2.0K/s")
+                                            .font(.system(size: 10, weight: .semibold, design: .monospaced))
+                                    }
+                                }
+                            }
+                            if monitor.showBatteryInMenuBar && monitor.battery.isPresent {
+                                HStack(spacing: 3) {
+                                    Image(systemName: "battery.100percent")
+                                        .font(.system(size: 11, weight: .semibold))
+                                        .foregroundStyle(MectricsTheme.coral)
+                                    Text(String(format: "%.0f%%", monitor.battery.percentage))
+                                        .font(.system(size: 11, weight: .semibold, design: .monospaced))
+                                }
+                            }
+                            if monitor.showSensorInMenuBar {
+                                HStack(spacing: 3) {
+                                    Image(systemName: "thermometer.medium")
+                                        .font(.system(size: 11, weight: .semibold))
+                                        .foregroundStyle(MectricsTheme.coral)
+                                    Text(monitor.formatTemperature(monitor.sensor.cpuTemperature))
+                                        .font(.system(size: 11, weight: .semibold, design: .monospaced))
+                                }
+                            }
+                            if monitor.showFansInMenuBar && !monitor.sensor.fans.isEmpty {
+                                let fastest = monitor.sensor.fans.map(\.currentRPM).max() ?? 0
+                                HStack(spacing: 3) {
+                                    Image(systemName: "fan.fill")
+                                        .font(.system(size: 11, weight: .semibold))
+                                        .foregroundStyle(MectricsTheme.coral)
+                                    Text("\(fastest)R")
+                                        .font(.system(size: 11, weight: .semibold, design: .monospaced))
+                                }
+                            }
+                            if monitor.showGPUInMenuBar {
+                                HStack(spacing: 3) {
+                                    Image(systemName: "display")
+                                        .font(.system(size: 11, weight: .semibold))
+                                        .foregroundStyle(MectricsTheme.coral)
+                                    Text(String(format: "%.0f%%", monitor.gpu.usagePercentage))
+                                        .font(.system(size: 11, weight: .semibold, design: .monospaced))
+                                }
                             }
                         }
                     }
+                    .padding(.vertical, 2)
                 }
-                .padding(.horizontal, 16)
-                .padding(.vertical, 10)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 8)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .background(Color.black.opacity(0.7))
                 .clipShape(RoundedRectangle(cornerRadius: 8))
@@ -319,18 +322,42 @@ public struct SettingsView: View {
                 )
             }
             
-            // Menu Bar Mode Selector
+            // Responsive Menu Bar Mode Selector (2x2 Grid Cards)
             VStack(alignment: .leading, spacing: 12) {
                 Text(loc("Display Mode"))
                     .font(.system(size: 13, weight: .bold))
                     .foregroundStyle(.white)
                 
-                Picker("", selection: $monitor.menuBarMode) {
-                    ForEach(MenuBarMode.allCases, id: \.self) { mode in
-                        Text(loc(mode.rawValue)).tag(mode)
-                    }
+                LazyVGrid(columns: [GridItem(.flexible(), spacing: 8), GridItem(.flexible(), spacing: 8)], spacing: 8) {
+                    modeSelectionCard(
+                        mode: .unified,
+                        icon: "macbook.gen2",
+                        title: loc("Unified Sample"),
+                        subtitle: "[M] CPU RAM",
+                        badge: loc("Recommended")
+                    )
+                    modeSelectionCard(
+                        mode: .dualStacked,
+                        icon: "rectangle.split.2x1",
+                        title: loc("Dual Stacked"),
+                        subtitle: "35px Slot",
+                        badge: "Notch"
+                    )
+                    modeSelectionCard(
+                        mode: .compactHealth,
+                        icon: "checkmark.shield",
+                        title: loc("Compact Shield"),
+                        subtitle: "Single Slot",
+                        badge: nil
+                    )
+                    modeSelectionCard(
+                        mode: .separate,
+                        icon: "square.grid.2x2",
+                        title: loc("Separate Items"),
+                        subtitle: "Multi Slot",
+                        badge: nil
+                    )
                 }
-                .pickerStyle(.segmented)
                 
                 if monitor.menuBarMode == .unified {
                     Text(loc("Unified Sample Note"))
@@ -357,6 +384,7 @@ public struct SettingsView: View {
                             }
                         }
                         .pickerStyle(.segmented)
+                        .frame(maxWidth: 320)
                         
                         Text(loc("Display Style Note"))
                             .font(.system(size: 10.5))
@@ -393,13 +421,12 @@ public struct SettingsView: View {
                             title: loc("Disk Storage"),
                             isOn: $monitor.showDiskInMenuBar
                         ) {
-                            Picker(loc("Format:"), selection: $monitor.diskDisplayMode) {
-                                ForEach(DiskDisplayMode.allCases, id: \.self) { mode in
-                                    Text(mode.rawValue).tag(mode)
-                                }
+                            Picker("", selection: $monitor.diskDisplayMode) {
+                                Text(loc("Free Space")).tag(DiskDisplayMode.freeSpace)
+                                Text(loc("Used %")).tag(DiskDisplayMode.percentage)
                             }
                             .pickerStyle(.segmented)
-                            .frame(maxWidth: .infinity)
+                            .frame(maxWidth: 240)
                         }
                         
                         Divider().overlay(Color.white.opacity(0.06))
@@ -436,13 +463,12 @@ public struct SettingsView: View {
                             title: loc("Network Throughput"),
                             isOn: $monitor.showNetworkInMenuBar
                         ) {
-                            Picker(loc("Format:"), selection: $monitor.networkDisplayMode) {
-                                ForEach(NetworkDisplayMode.allCases, id: \.self) { mode in
-                                    Text(mode.rawValue).tag(mode)
-                                }
+                            Picker("", selection: $monitor.networkDisplayMode) {
+                                Text("Stacked ↓/↑").tag(NetworkDisplayMode.stacked)
+                                Text("Single Total").tag(NetworkDisplayMode.totalRate)
                             }
                             .pickerStyle(.segmented)
-                            .frame(maxWidth: .infinity)
+                            .frame(maxWidth: 240)
                         }
                         
                         Divider().overlay(Color.white.opacity(0.06))
@@ -544,6 +570,63 @@ public struct SettingsView: View {
                     .padding(.leading, 24)
             }
         }
+    }
+    
+    private func modeSelectionCard(
+        mode: MenuBarMode,
+        icon: String,
+        title: String,
+        subtitle: String,
+        badge: String?
+    ) -> some View {
+        let isSelected = (monitor.menuBarMode == mode)
+        return Button {
+            withAnimation(.spring(response: 0.25, dampingFraction: 0.75)) {
+                monitor.menuBarMode = mode
+            }
+        } label: {
+            HStack(spacing: 8) {
+                Image(systemName: icon)
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(isSelected ? MectricsTheme.coral : MectricsTheme.textSecondary)
+                    .frame(width: 20)
+                VStack(alignment: .leading, spacing: 2) {
+                    HStack(spacing: 4) {
+                        Text(title)
+                            .font(.system(size: 11.5, weight: .semibold))
+                            .foregroundStyle(isSelected ? .white : MectricsTheme.textSecondary)
+                            .lineLimit(1)
+                        if let b = badge {
+                            Text(b)
+                                .font(.system(size: 8, weight: .bold))
+                                .padding(.horizontal, 4)
+                                .padding(.vertical, 1)
+                                .background(MectricsTheme.coral.opacity(0.2))
+                                .foregroundStyle(MectricsTheme.coral)
+                                .clipShape(Capsule())
+                        }
+                    }
+                    Text(subtitle)
+                        .font(.system(size: 9.5, weight: .regular))
+                        .foregroundStyle(MectricsTheme.textTertiary)
+                        .lineLimit(1)
+                }
+                Spacer(minLength: 4)
+                Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
+                    .font(.system(size: 12))
+                    .foregroundStyle(isSelected ? MectricsTheme.coral : Color.white.opacity(0.15))
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 8)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(isSelected ? MectricsTheme.coral.opacity(0.12) : Color.white.opacity(0.03))
+            .clipShape(RoundedRectangle(cornerRadius: 8))
+            .overlay(
+                RoundedRectangle(cornerRadius: 8)
+                    .stroke(isSelected ? MectricsTheme.coral.opacity(0.6) : Color.white.opacity(0.08), lineWidth: 1)
+            )
+        }
+        .buttonStyle(.plain)
     }
     
     private func restoreDefaultStatusBar() {

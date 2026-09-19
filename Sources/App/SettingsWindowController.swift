@@ -22,7 +22,8 @@ public final class SettingsWindowController: NSObject, NSWindowDelegate {
         
         let newWindow = NSWindow(contentViewController: hostingController)
         newWindow.title = localizedTitle
-        newWindow.styleMask = [.titled, .closable, .miniaturizable]
+        newWindow.styleMask = [.titled, .closable, .miniaturizable, .resizable]
+        newWindow.minSize = NSSize(width: 520, height: 580)
         newWindow.titlebarAppearsTransparent = true
         newWindow.titleVisibility = .visible
         newWindow.isReleasedWhenClosed = false
