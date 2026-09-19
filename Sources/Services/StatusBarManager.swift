@@ -9,6 +9,21 @@ public final class StatusBarManager: NSObject, NSPopoverDelegate {
     private let monitor = SystemMonitor.shared
     private var cancellables = Set<AnyCancellable>()
     private var activeStatusItem: NSStatusItem?
+    public private(set) var activePopover: NSPopover?
+    public private(set) var activeSegment: UnifiedSegment = .none
+    public private(set) var isPopoverPinned: Bool = false
+    
+    private var hoverOpenTimer: Timer?
+    private var hoverLivenessTimer: Timer?
+    private var outsideGraceTicks: Int = 0
+    private var pendingTargetPopover: NSPopover?
+    private var pendingTargetSegment: UnifiedSegment = .none
+    private var pendingTargetItem: NSStatusItem?
+    private var pendingTargetRect: NSRect = .zero
+    private var globalMouseMonitor: Any?
+    private var localMouseMonitor: Any?
+    private var lastMouseEvalTime: TimeInterval = 0
+    private var currentHoverID = UUID()
     
     // Status Items
     private var unifiedItem: NSStatusItem!
@@ -126,12 +141,41 @@ public final class StatusBarManager: NSObject, NSPopoverDelegate {
     }
     
     public var hasActivePopover: Bool {
-        activeStatusItem != nil
+        activePopover?.isShown == true
+    }
+    
+    public func popover(for type: HoverDetailType, item: NSStatusItem) -> NSPopover {
+        switch type {
+        case .cpu: return cpuPopover
+        case .memory: return memoryPopover
+        case .disk: return diskPopover
+        case .network: return networkPopover
+        case .battery: return batteryPopover
+        case .sensor: return sensorPopover
+        case .fans: return fansPopover
+        case .gpu: return gpuPopover
+        case .master:
+            if item === compactHealthItem {
+                return compactHealthPopover
+            } else if item === dualStackedItem {
+                return dualStackedPopover
+            } else {
+                return unifiedPopover
+            }
+        }
     }
     
     public func popoverDidClose(_ notification: Notification) {
-        activeStatusItem = nil
-        updateAllViews()
+        if (notification.object as? NSPopover) === activePopover {
+            activePopover = nil
+            activeStatusItem = nil
+            activeSegment = .none
+            isPopoverPinned = false
+            cancelHoverTimers()
+            stopHoverLivenessTimer()
+            stopMouseMonitoring()
+            updateAllViews()
+        }
     }
     
     private func observeMonitor() {
@@ -205,46 +249,49 @@ public final class StatusBarManager: NSObject, NSPopoverDelegate {
         let style = monitor.menuBarDisplayStyle
         
         // 0. Unified Sample Mode ([M] CPU % RAM %)
+        // 0. Unified Sample Mode ([M] CPU % RAM %)
         if mode == .unified {
-            let uActive = (activeStatusItem === unifiedItem)
+            let uActive = (activeStatusItem === unifiedItem && activePopover?.isShown == true)
             let uView = AnyView(
                 UnifiedSampleMenuBarView(
                     cpuUsage: monitor.cpu.totalUsage,
                     memUsage: monitor.memory.usagePercentage,
-                    isActive: uActive
+                    isActive: uActive,
+                    activeSegment: uActive ? activeSegment : .none
                 )
             )
-            setHostingView(for: unifiedItem, hosting: &unifiedHosting, view: uView, width: uActive ? 134 : 126, hoverType: .master, isUnified: true)
+            setHostingView(for: unifiedItem, hosting: &unifiedHosting, view: uView, width: 130, hoverType: .master, isUnified: true)
             return
         }
         
         // 1. Compact Health View
         if mode == .compactHealth {
-            let chActive = (activeStatusItem === compactHealthItem)
+            let chActive = (activeStatusItem === compactHealthItem && activePopover?.isShown == true)
             let chView = AnyView(
                 CompactHealthBarView(statusLevel: monitor.health.statusLevel, isActive: chActive)
             )
-            setHostingView(for: compactHealthItem, hosting: &compactHealthHosting, view: chView, width: chActive ? 28 : 22, hoverType: .master)
+            setHostingView(for: compactHealthItem, hosting: &compactHealthHosting, view: chView, width: 26, hoverType: .master)
             return
         }
         
         // 2. Dual Stacked View (CPU & RAM 35px Mini Item)
         if mode == .dualStacked {
-            let dualActive = (activeStatusItem === dualStackedItem)
+            let dualActive = (activeStatusItem === dualStackedItem && activePopover?.isShown == true)
             let dualView = AnyView(
                 DualStackedMenuBarView(
                     cpuUsage: monitor.cpu.totalUsage,
                     memUsage: monitor.memory.usagePercentage,
-                    isActive: dualActive
+                    isActive: dualActive,
+                    activeSegment: dualActive ? activeSegment : .none
                 )
             )
-            setHostingView(for: dualStackedItem, hosting: &dualStackedHosting, view: dualView, width: dualActive ? 42 : 36, hoverType: .master, isDualStacked: true)
+            setHostingView(for: dualStackedItem, hosting: &dualStackedHosting, view: dualView, width: 38, hoverType: .master, isDualStacked: true)
             return
         }
         
         // 3. Disk View
         if monitor.showDiskInMenuBar {
-            let diskActive = (activeStatusItem === diskItem)
+            let diskActive = (activeStatusItem === diskItem && activePopover?.isShown == true)
             let diskText = (monitor.diskDisplayMode == .percentage)
                 ? String(format: "%.0f%%", monitor.disk.usagePercentage)
                 : "\(monitor.disk.freeBytes / (1024 * 1024 * 1024))GB"
@@ -257,13 +304,13 @@ public final class StatusBarManager: NSObject, NSPopoverDelegate {
                     isActive: diskActive
                 )
             )
-            let dWidth: CGFloat = (style == .minimal) ? (diskActive ? 38 : 32) : ((style == .compact) ? (diskActive ? 52 : 46) : (diskActive ? 64 : 56))
+            let dWidth: CGFloat = (style == .minimal) ? 34 : ((style == .compact) ? 48 : 58)
             setHostingView(for: diskItem, hosting: &diskHosting, view: dView, width: dWidth, hoverType: .disk)
         }
         
         // 4. Memory View
         if monitor.showMemoryInMenuBar {
-            let memActive = (activeStatusItem === memoryItem)
+            let memActive = (activeStatusItem === memoryItem && activePopover?.isShown == true)
             let mView = AnyView(
                 MenuBarItemView(
                     icon: "memorychip",
@@ -275,15 +322,15 @@ public final class StatusBarManager: NSObject, NSPopoverDelegate {
                     isActive: memActive
                 )
             )
-            let memWidth: CGFloat = (style == .minimal) ? (memActive ? 36 : 30) :
-                ((style == .compact) ? (memActive ? 52 : 46) :
-                (monitor.showMemorySparkline ? (memActive ? 82 : 74) : (memActive ? 58 : 50)))
+            let memWidth: CGFloat = (style == .minimal) ? 32 :
+                ((style == .compact) ? 48 :
+                (monitor.showMemorySparkline ? 78 : 54))
             setHostingView(for: memoryItem, hosting: &memoryHosting, view: mView, width: memWidth, hoverType: .memory)
         }
         
         // 5. CPU View
         if monitor.showCPUInMenuBar {
-            let cpuActive = (activeStatusItem === cpuItem)
+            let cpuActive = (activeStatusItem === cpuItem && activePopover?.isShown == true)
             let cView = AnyView(
                 MenuBarItemView(
                     icon: "cpu",
@@ -295,15 +342,15 @@ public final class StatusBarManager: NSObject, NSPopoverDelegate {
                     isActive: cpuActive
                 )
             )
-            let cpuWidth: CGFloat = (style == .minimal) ? (cpuActive ? 36 : 30) :
-                ((style == .compact) ? (cpuActive ? 52 : 46) :
-                (monitor.showCPUSparkline ? (cpuActive ? 86 : 78) : (cpuActive ? 58 : 50)))
+            let cpuWidth: CGFloat = (style == .minimal) ? 32 :
+                ((style == .compact) ? 48 :
+                (monitor.showCPUSparkline ? 82 : 54))
             setHostingView(for: cpuItem, hosting: &cpuHosting, view: cView, width: cpuWidth, hoverType: .cpu)
         }
         
         // 6. Network View
         if monitor.showNetworkInMenuBar {
-            let netActive = (activeStatusItem === networkItem)
+            let netActive = (activeStatusItem === networkItem && activePopover?.isShown == true)
             let nView: AnyView
             let nWidth: CGFloat
             if monitor.networkDisplayMode == .stacked {
@@ -315,7 +362,7 @@ public final class StatusBarManager: NSObject, NSPopoverDelegate {
                         isActive: netActive
                     )
                 )
-                nWidth = netActive ? 66 : 58
+                nWidth = 62
             } else {
                 let total = monitor.network.downloadBytesPerSec + monitor.network.uploadBytesPerSec
                 nView = AnyView(
@@ -327,15 +374,14 @@ public final class StatusBarManager: NSObject, NSPopoverDelegate {
                         isActive: netActive
                     )
                 )
-                nWidth = (style == .minimal) ? (netActive ? 42 : 36) :
-                    ((style == .compact) ? (netActive ? 56 : 48) : (netActive ? 70 : 62))
+                nWidth = (style == .minimal) ? 38 : ((style == .compact) ? 50 : 64)
             }
             setHostingView(for: networkItem, hosting: &networkHosting, view: nView, width: nWidth, hoverType: .network)
         }
         
         // 7. Battery View
         if monitor.showBatteryInMenuBar && monitor.battery.isPresent {
-            let batActive = (activeStatusItem === batteryItem)
+            let batActive = (activeStatusItem === batteryItem && activePopover?.isShown == true)
             let bView = AnyView(
                 MenuBarItemView(
                     icon: monitor.battery.isCharging ? "battery.100percent.bolt" : "battery.100percent",
@@ -345,14 +391,13 @@ public final class StatusBarManager: NSObject, NSPopoverDelegate {
                     isActive: batActive
                 )
             )
-            let bWidth: CGFloat = (style == .minimal) ? (batActive ? 36 : 30) :
-                ((style == .compact) ? (batActive ? 50 : 44) : (batActive ? 58 : 50))
+            let bWidth: CGFloat = (style == .minimal) ? 32 : ((style == .compact) ? 46 : 54)
             setHostingView(for: batteryItem, hosting: &batteryHosting, view: bView, width: bWidth, hoverType: .battery)
         }
         
         // 8. Sensor View
         if monitor.showSensorInMenuBar {
-            let senActive = (activeStatusItem === sensorItem)
+            let senActive = (activeStatusItem === sensorItem && activePopover?.isShown == true)
             let sView = AnyView(
                 MenuBarItemView(
                     icon: "thermometer.medium",
@@ -363,14 +408,13 @@ public final class StatusBarManager: NSObject, NSPopoverDelegate {
                     isActive: senActive
                 )
             )
-            let sWidth: CGFloat = (style == .minimal) ? (senActive ? 38 : 32) :
-                ((style == .compact) ? (senActive ? 52 : 46) : (senActive ? 62 : 54))
+            let sWidth: CGFloat = (style == .minimal) ? 34 : ((style == .compact) ? 48 : 56)
             setHostingView(for: sensorItem, hosting: &sensorHosting, view: sView, width: sWidth, hoverType: .sensor)
         }
         
         // 9. Fans View
         if monitor.showFansInMenuBar && !monitor.sensor.fans.isEmpty {
-            let fanActive = (activeStatusItem === fansItem)
+            let fanActive = (activeStatusItem === fansItem && activePopover?.isShown == true)
             let fastest = monitor.sensor.fans.map(\.currentRPM).max() ?? 0
             let fanText = fastest > 0 ? "\(fastest)" : "0"
             let fView = AnyView(
@@ -382,14 +426,13 @@ public final class StatusBarManager: NSObject, NSPopoverDelegate {
                     isActive: fanActive
                 )
             )
-            let fWidth: CGFloat = (style == .minimal) ? (fanActive ? 42 : 36) :
-                ((style == .compact) ? (fanActive ? 52 : 46) : (fanActive ? 58 : 50))
+            let fWidth: CGFloat = (style == .minimal) ? 36 : ((style == .compact) ? 48 : 54)
             setHostingView(for: fansItem, hosting: &fansHosting, view: fView, width: fWidth, hoverType: .fans)
         }
         
         // 10. GPU View
         if monitor.showGPUInMenuBar {
-            let gpuActive = (activeStatusItem === gpuItem)
+            let gpuActive = (activeStatusItem === gpuItem && activePopover?.isShown == true)
             let gView = AnyView(
                 MenuBarItemView(
                     icon: "display",
@@ -400,8 +443,7 @@ public final class StatusBarManager: NSObject, NSPopoverDelegate {
                     isActive: gpuActive
                 )
             )
-            let gWidth: CGFloat = (style == .minimal) ? (gpuActive ? 36 : 30) :
-                ((style == .compact) ? (gpuActive ? 50 : 44) : (gpuActive ? 60 : 52))
+            let gWidth: CGFloat = (style == .minimal) ? 32 : ((style == .compact) ? 46 : 56)
             setHostingView(for: gpuItem, hosting: &gpuHosting, view: gView, width: gWidth, hoverType: .gpu)
         }
     }
@@ -424,12 +466,14 @@ public final class StatusBarManager: NSObject, NSPopoverDelegate {
             h.isUnifiedMode = isUnified
             h.isDualStacked = isDualStacked
             h.statusButton = button
+            h.statusItem = item
         } else {
             let h = StatusItemHostingView(rootView: view)
             h.defaultHoverType = hoverType
             h.isUnifiedMode = isUnified
             h.isDualStacked = isDualStacked
             h.statusButton = button
+            h.statusItem = item
             button.addSubview(h)
             h.translatesAutoresizingMaskIntoConstraints = false
             NSLayoutConstraint.activate([
@@ -456,22 +500,150 @@ public final class StatusBarManager: NSObject, NSPopoverDelegate {
         }
     }
     
-    // MARK: - Actions
-    @objc private func toggleUnified() { toggle(unifiedPopover, for: unifiedItem) }
-    @objc private func toggleCompactHealth() { toggle(compactHealthPopover, for: compactHealthItem) }
-    @objc private func toggleDualStacked() { toggle(dualStackedPopover, for: dualStackedItem) }
-    @objc private func toggleDisk() { toggle(diskPopover, for: diskItem) }
-    @objc private func toggleMemory() { toggle(memoryPopover, for: memoryItem) }
-    @objc private func toggleCPU() { toggle(cpuPopover, for: cpuItem) }
-    @objc private func toggleNetwork() { toggle(networkPopover, for: networkItem) }
-    @objc private func toggleBattery() { toggle(batteryPopover, for: batteryItem) }
-    @objc private func toggleSensor() { toggle(sensorPopover, for: sensorItem) }
-    @objc private func toggleFans() { toggle(fansPopover, for: fansItem) }
-    @objc private func toggleGPU() { toggle(gpuPopover, for: gpuItem) }
+    // MARK: - Actions & Click Handling
+    @objc private func toggleUnified() {
+        guard let button = unifiedItem.button else { return }
+        let isRightClick = (NSApp.currentEvent?.type == .rightMouseUp)
+        if isRightClick {
+            showContextMenu(for: unifiedItem)
+            return
+        }
+        let mouseInWin = NSApp.currentEvent?.locationInWindow ?? .zero
+        let point = button.convert(mouseInWin, from: nil)
+        
+        let popover: NSPopover
+        let sourceRect: NSRect
+        let segment: UnifiedSegment
+        if point.x < 32 {
+            popover = unifiedPopover
+            sourceRect = NSRect(x: 0, y: 0, width: 32, height: button.bounds.height)
+            segment = .master
+        } else if point.x < 80 {
+            popover = cpuPopover
+            sourceRect = NSRect(x: 32, y: 0, width: 48, height: button.bounds.height)
+            segment = .cpu
+        } else {
+            popover = memoryPopover
+            sourceRect = NSRect(x: 80, y: 0, width: max(20, button.bounds.width - 80), height: button.bounds.height)
+            segment = .memory
+        }
+        handleItemClick(popover: popover, for: unifiedItem, sourceRect: sourceRect, segment: segment)
+    }
     
-    private func toggle(_ popover: NSPopover, for item: NSStatusItem) {
+    @objc private func toggleCompactHealth() {
+        handleItemClick(popover: compactHealthPopover, for: compactHealthItem, sourceRect: compactHealthItem.button?.bounds ?? .zero, segment: .master)
+    }
+    
+    @objc private func toggleDualStacked() {
+        guard let button = dualStackedItem.button else { return }
+        let isRightClick = (NSApp.currentEvent?.type == .rightMouseUp)
+        if isRightClick {
+            showContextMenu(for: dualStackedItem)
+            return
+        }
+        let mouseInWin = NSApp.currentEvent?.locationInWindow ?? .zero
+        let point = button.convert(mouseInWin, from: nil)
+        let isTop = point.y > 11
+        let popover = isTop ? cpuPopover! : memoryPopover!
+        let segment: UnifiedSegment = isTop ? .cpu : .memory
+        handleItemClick(popover: popover, for: dualStackedItem, sourceRect: button.bounds, segment: segment)
+    }
+    
+    @objc private func toggleDisk() { handleItemClick(popover: diskPopover, for: diskItem, sourceRect: diskItem.button?.bounds ?? .zero, segment: .none) }
+    @objc private func toggleMemory() { handleItemClick(popover: memoryPopover, for: memoryItem, sourceRect: memoryItem.button?.bounds ?? .zero, segment: .none) }
+    @objc private func toggleCPU() { handleItemClick(popover: cpuPopover, for: cpuItem, sourceRect: cpuItem.button?.bounds ?? .zero, segment: .none) }
+    @objc private func toggleNetwork() { handleItemClick(popover: networkPopover, for: networkItem, sourceRect: networkItem.button?.bounds ?? .zero, segment: .none) }
+    @objc private func toggleBattery() { handleItemClick(popover: batteryPopover, for: batteryItem, sourceRect: batteryItem.button?.bounds ?? .zero, segment: .none) }
+    @objc private func toggleSensor() { handleItemClick(popover: sensorPopover, for: sensorItem, sourceRect: sensorItem.button?.bounds ?? .zero, segment: .none) }
+    @objc private func toggleFans() { handleItemClick(popover: fansPopover, for: fansItem, sourceRect: fansItem.button?.bounds ?? .zero, segment: .none) }
+    @objc private func toggleGPU() { handleItemClick(popover: gpuPopover, for: gpuItem, sourceRect: gpuItem.button?.bounds ?? .zero, segment: .none) }
+    
+    // MARK: - Popover Hover & Pinning System
+    
+    public func handleMouseEnteredSegment(
+        popover: NSPopover,
+        for item: NSStatusItem,
+        sourceRect: NSRect,
+        segment: UnifiedSegment = .none
+    ) {
+        if isPopoverPinned && activePopover?.isShown == true {
+            return
+        }
+        
+        // 1. If this exact popover is already showing on this segment
+        if activePopover === popover && popover.isShown {
+            outsideGraceTicks = 0
+            hoverOpenTimer?.invalidate()
+            hoverOpenTimer = nil
+            pendingTargetPopover = nil
+            if activeSegment != segment {
+                activeSegment = segment
+                updateAllViews()
+            }
+            return
+        }
+        
+        // 2. Fast Switching: If another popover is already open, switch immediately without delay
+        if let current = activePopover, current.isShown, current !== popover {
+            cancelHoverTimers()
+            pendingTargetPopover = nil
+            showPopover(popover, for: item, sourceRect: sourceRect, segment: segment, pinned: false)
+            return
+        }
+        
+        // 3. Debounce: If already waiting to open this exact target, don't re-trigger
+        if pendingTargetPopover === popover && pendingTargetSegment == segment && hoverOpenTimer != nil {
+            return
+        }
+        
+        pendingTargetPopover = popover
+        pendingTargetSegment = segment
+        pendingTargetItem = item
+        pendingTargetRect = sourceRect
+        
+        let requestID = UUID()
+        currentHoverID = requestID
+        hoverOpenTimer?.invalidate()
+        hoverOpenTimer = Timer.scheduledTimer(withTimeInterval: 0.05, repeats: false) { [weak self] _ in
+            DispatchQueue.main.async {
+                guard let self = self,
+                      self.currentHoverID == requestID,
+                      let targetItem = self.pendingTargetItem else { return }
+                let targetRect = self.pendingTargetRect
+                self.hoverOpenTimer = nil
+                self.pendingTargetPopover = nil
+                self.pendingTargetItem = nil
+                self.showPopover(popover, for: targetItem, sourceRect: targetRect, segment: segment, pinned: false)
+            }
+        }
+    }
+    
+    public func handleMouseExitedSegment() {
+        if isPopoverPinned {
+            return
+        }
+        
+        // If mouse left before opening, cancel pending open
+        if hoverOpenTimer != nil {
+            cancelHoverTimers()
+            pendingTargetPopover = nil
+        }
+        
+        // Check mouse position immediately
+        evaluateHoverLiveness()
+    }
+    
+    public func handleItemClick(
+        popover: NSPopover,
+        for item: NSStatusItem,
+        sourceRect: NSRect,
+        segment: UnifiedSegment = .none
+    ) {
         HoverDetailWindowController.shared.hideImmediately()
-        guard let button = item.button else { return }
+        guard item.button != nil else { return }
+        
+        // Luxurious Apple tactile haptic click
+        NSHapticFeedbackManager.defaultPerformer.perform(.generic, performanceTime: .default)
         
         let isRightClick = (NSApp.currentEvent?.type == .rightMouseUp)
         if isRightClick {
@@ -479,20 +651,255 @@ public final class StatusBarManager: NSObject, NSPopoverDelegate {
             return
         }
         
-        if popover.isShown {
-            popover.performClose(nil)
-            activeStatusItem = nil
-            updateAllViews()
+        // Standard macOS Toggle UX:
+        // If this exact popover is already showing on this segment, click toggles it off
+        if activePopover === popover && popover.isShown && (activeSegment == segment || segment == .none) {
+            closeActivePopover()
         } else {
             closeAllPopovers()
-            activeStatusItem = item
-            updateAllViews()
-            NSApp.activate(ignoringOtherApps: true)
-            popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
+            showPopover(popover, for: item, sourceRect: sourceRect, segment: segment, pinned: true)
         }
     }
     
-    private func showContextMenu(for item: NSStatusItem) {
+    private func showPopover(
+        _ popover: NSPopover,
+        for item: NSStatusItem,
+        sourceRect: NSRect,
+        segment: UnifiedSegment,
+        pinned: Bool
+    ) {
+        guard let button = item.button else { return }
+        
+        cancelHoverTimers()
+        
+        // 1. Guard against re-showing the same already-visible popover
+        if activePopover === popover && popover.isShown {
+            if activeSegment != segment {
+                activeSegment = segment
+                updateAllViews()
+            }
+            isPopoverPinned = pinned
+            if !pinned {
+                startHoverLivenessTimer()
+            } else {
+                stopHoverLivenessTimer()
+            }
+            return
+        }
+        
+        // 2. Strict Single-Window Guarantee: Synchronously purge ALL other popovers instantly
+        closeAllPopoversImmediately(except: popover)
+        
+        activePopover = popover
+        activeStatusItem = item
+        activeSegment = segment
+        isPopoverPinned = pinned
+        
+        updateAllViews()
+        
+        if pinned {
+            NSApp.activate(ignoringOtherApps: true)
+            stopHoverLivenessTimer()
+        }
+        
+        popover.show(relativeTo: sourceRect, of: button, preferredEdge: .minY)
+        startMouseMonitoring()
+        
+        if !pinned {
+            startHoverLivenessTimer()
+        }
+    }
+    
+    public func closeActivePopover() {
+        cancelHoverTimers()
+        stopHoverLivenessTimer()
+        currentHoverID = UUID()
+        stopMouseMonitoring()
+        isPopoverPinned = false
+        activeSegment = .none
+        pendingTargetPopover = nil
+        
+        closeAllPopoversImmediately()
+        activePopover = nil
+        activeStatusItem = nil
+        updateAllViews()
+    }
+    
+    public func closeAllPopovers() {
+        HoverDetailWindowController.shared.hideImmediately()
+        cancelHoverTimers()
+        stopHoverLivenessTimer()
+        currentHoverID = UUID()
+        stopMouseMonitoring()
+        isPopoverPinned = false
+        activePopover = nil
+        activeStatusItem = nil
+        activeSegment = .none
+        pendingTargetPopover = nil
+        
+        closeAllPopoversImmediately()
+        updateAllViews()
+    }
+    
+    private func closeAllPopoversImmediately(except keepPopover: NSPopover? = nil) {
+        let all: [NSPopover?] = [
+            unifiedPopover, compactHealthPopover, dualStackedPopover,
+            diskPopover, memoryPopover, cpuPopover, networkPopover,
+            batteryPopover, sensorPopover, fansPopover, gpuPopover
+        ]
+        for p in all {
+            guard let p = p, p !== keepPopover else { continue }
+            p.animates = false
+            p.performClose(nil)
+            p.close()
+            if let win = p.contentViewController?.view.window {
+                win.orderOut(nil)
+            }
+            p.animates = true
+        }
+        
+        // Ensure no orphan popover windows stay visible on screen
+        for window in NSApp.windows {
+            let className = String(describing: type(of: window))
+            if className.contains("Popover") {
+                if let keepWin = keepPopover?.contentViewController?.view.window, window === keepWin {
+                    continue
+                }
+                window.orderOut(nil)
+            }
+        }
+    }
+    
+    // MARK: - Hover Liveness Monitoring (Deterministic 40ms loop)
+    private func startHoverLivenessTimer() {
+        stopHoverLivenessTimer()
+        outsideGraceTicks = 0
+        hoverLivenessTimer = Timer.scheduledTimer(withTimeInterval: 0.04, repeats: true) { [weak self] _ in
+            DispatchQueue.main.async {
+                self?.evaluateHoverLiveness()
+            }
+        }
+    }
+    
+    private func stopHoverLivenessTimer() {
+        hoverLivenessTimer?.invalidate()
+        hoverLivenessTimer = nil
+        outsideGraceTicks = 0
+    }
+    
+    private func evaluateHoverLiveness() {
+        guard let popover = activePopover, popover.isShown, !isPopoverPinned else {
+            stopHoverLivenessTimer()
+            return
+        }
+        
+        let mouseLoc = NSEvent.mouseLocation
+        if isMouseOverActivePopoverOrButton(mouseLoc: mouseLoc) {
+            outsideGraceTicks = 0
+        } else {
+            outsideGraceTicks += 1
+            // 4 ticks * 40ms = 160ms outside -> auto close cleanly without flickering!
+            if outsideGraceTicks >= 4 {
+                closeActivePopover()
+            }
+        }
+    }
+    
+    private func isMouseOverActivePopoverOrButton(mouseLoc: NSPoint) -> Bool {
+        guard let popover = activePopover, popover.isShown else { return false }
+        
+        // 1. Active popover window frame (+ 6pt safety margin)
+        if let popWindow = popover.contentViewController?.view.window {
+            let popFrame = popWindow.frame.insetBy(dx: -6, dy: -6)
+            if popFrame.contains(mouseLoc) {
+                return true
+            }
+            
+            // 2. Active status item button frame (+ 4pt safety margin)
+            if let button = activeStatusItem?.button, let win = button.window {
+                let rectInWin = button.convert(button.bounds, to: nil)
+                let buttonScreenRect = win.convertToScreen(rectInWin).insetBy(dx: -4, dy: -4)
+                if buttonScreenRect.contains(mouseLoc) {
+                    return true
+                }
+                
+                // 3. Narrow bridge between menu bar button and popover top edge
+                // Only covers the narrow vertical gap between button and popover top, with button width + 24pt
+                let bridgeMinY = min(buttonScreenRect.minY, popFrame.maxY) - 2
+                let bridgeMaxY = max(buttonScreenRect.minY, popFrame.maxY) + 2
+                let bridgeMinX = min(buttonScreenRect.minX - 12, popFrame.midX - 30)
+                let bridgeMaxX = max(buttonScreenRect.maxX + 12, popFrame.midX + 30)
+                let bridgeRect = NSRect(
+                    x: bridgeMinX,
+                    y: bridgeMinY,
+                    width: max(bridgeMaxX - bridgeMinX, 20),
+                    height: max(bridgeMaxY - bridgeMinY, 4)
+                )
+                if bridgeRect.contains(mouseLoc) {
+                    return true
+                }
+            }
+        }
+        
+        return false
+    }
+    
+    private func startMouseMonitoring() {
+        stopMouseMonitoring()
+        
+        localMouseMonitor = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown, .keyDown]) { [weak self] event in
+            guard let self = self else { return event }
+            
+            // ESC key (code 53) closes any open popover instantly
+            if event.type == .keyDown && event.keyCode == 53 {
+                self.closeActivePopover()
+                return nil
+            }
+            
+            if event.type == .leftMouseDown {
+                if let popWindow = self.activePopover?.contentViewController?.view.window,
+                   popWindow.frame.contains(NSEvent.mouseLocation) {
+                    self.isPopoverPinned = true
+                    self.stopHoverLivenessTimer()
+                    self.stopGlobalMouseMonitoring()
+                }
+            }
+            return event
+        }
+        
+        // Monitor global mouse moves while unpinned to immediately trigger liveness evaluation
+        if !isPopoverPinned {
+            globalMouseMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.mouseMoved]) { [weak self] _ in
+                DispatchQueue.main.async {
+                    self?.evaluateHoverLiveness()
+                }
+            }
+        }
+    }
+    
+    private func stopGlobalMouseMonitoring() {
+        if let global = globalMouseMonitor {
+            NSEvent.removeMonitor(global)
+            globalMouseMonitor = nil
+        }
+    }
+    
+    private func stopMouseMonitoring() {
+        if let local = localMouseMonitor {
+            NSEvent.removeMonitor(local)
+            localMouseMonitor = nil
+        }
+        stopGlobalMouseMonitoring()
+    }
+    
+    private func cancelHoverTimers() {
+        hoverOpenTimer?.invalidate()
+        hoverOpenTimer = nil
+        pendingTargetPopover = nil
+        pendingTargetItem = nil
+    }
+    
+    public func showContextMenu(for item: NSStatusItem) {
         guard let button = item.button else { return }
         closeAllPopovers()
         
@@ -603,21 +1010,15 @@ public final class StatusBarManager: NSObject, NSPopoverDelegate {
     @objc private func quitAppAction() {
         NSApplication.shared.terminate(nil)
     }
-    
-    public func closeAllPopovers() {
-        HoverDetailWindowController.shared.hideImmediately()
-        [unifiedPopover, compactHealthPopover, dualStackedPopover, diskPopover, memoryPopover, cpuPopover, networkPopover, batteryPopover, sensorPopover, fansPopover, gpuPopover].forEach {
-            $0?.performClose(nil)
-        }
-    }
 }
 
-// MARK: - Status Item Hosting View with Mouse Tracking for Hover Cards
+// MARK: - Status Item Hosting View with Mouse Tracking for Hover Popovers
 public final class StatusItemHostingView: NSHostingView<AnyView> {
     public var defaultHoverType: HoverDetailType = .master
     public var isUnifiedMode: Bool = false
     public var isDualStacked: Bool = false
     public weak var statusButton: NSStatusBarButton?
+    public weak var statusItem: NSStatusItem?
     
     private var trackingArea: NSTrackingArea?
     
@@ -643,41 +1044,64 @@ public final class StatusItemHostingView: NSHostingView<AnyView> {
     
     public override func mouseEntered(with event: NSEvent) {
         super.mouseEntered(with: event)
-        guard let button = statusButton ?? superview as? NSStatusBarButton else { return }
-        let type = resolveHoverType(at: convert(event.locationInWindow, from: nil))
-        HoverDetailWindowController.shared.mouseEnteredAnchor(type: type, anchorView: button)
+        handleHoverEvent(event)
     }
     
     public override func mouseMoved(with event: NSEvent) {
         super.mouseMoved(with: event)
-        guard let button = statusButton ?? superview as? NSStatusBarButton else { return }
-        let type = resolveHoverType(at: convert(event.locationInWindow, from: nil))
-        HoverDetailWindowController.shared.mouseEnteredAnchor(type: type, anchorView: button)
+        handleHoverEvent(event)
     }
     
     public override func mouseExited(with event: NSEvent) {
         super.mouseExited(with: event)
-        HoverDetailWindowController.shared.mouseExitedAnchor()
+        StatusBarManager.shared.handleMouseExitedSegment()
     }
     
-    private func resolveHoverType(at point: NSPoint) -> HoverDetailType {
+    public override func mouseDown(with event: NSEvent) {
+        handleClickEvent(event)
+    }
+    
+    public override func rightMouseDown(with event: NSEvent) {
+        guard let item = statusItem else { return }
+        StatusBarManager.shared.showContextMenu(for: item)
+    }
+    
+    private func handleClickEvent(_ event: NSEvent) {
+        guard let item = statusItem else { return }
+        let point = convert(event.locationInWindow, from: nil)
+        let (popover, sourceRect, segment) = resolveTarget(at: point)
+        StatusBarManager.shared.handleItemClick(popover: popover, for: item, sourceRect: sourceRect, segment: segment)
+    }
+    
+    private func handleHoverEvent(_ event: NSEvent) {
+        guard let item = statusItem else { return }
+        let point = convert(event.locationInWindow, from: nil)
+        let (popover, sourceRect, segment) = resolveTarget(at: point)
+        StatusBarManager.shared.handleMouseEnteredSegment(popover: popover, for: item, sourceRect: sourceRect, segment: segment)
+    }
+    
+    private func resolveTarget(at point: NSPoint) -> (NSPopover, NSRect, UnifiedSegment) {
+        let mgr = StatusBarManager.shared
+        guard let item = statusItem else {
+            return (mgr.popover(for: defaultHoverType, item: NSStatusItem()), bounds, .none)
+        }
+        
         if isUnifiedMode {
-            // In Unified Sample View:
-            // [M] is roughly 0..32px
-            // CPU metric is roughly 32..80px
-            // RAM metric is roughly 80..134px
             if point.x < 32 {
-                return .master
+                return (mgr.popover(for: .master, item: item), NSRect(x: 0, y: 0, width: 32, height: bounds.height), .master)
             } else if point.x < 80 {
-                return .cpu
+                return (mgr.popover(for: .cpu, item: item), NSRect(x: 32, y: 0, width: 48, height: bounds.height), .cpu)
             } else {
-                return .memory
+                return (mgr.popover(for: .memory, item: item), NSRect(x: 80, y: 0, width: max(20, bounds.width - 80), height: bounds.height), .memory)
             }
         } else if isDualStacked {
-            // Dual stacked has CPU on top, RAM on bottom (height is ~22px)
-            return point.y > 11 ? .cpu : .memory
+            if point.y > 11 {
+                return (mgr.popover(for: .cpu, item: item), bounds, .cpu)
+            } else {
+                return (mgr.popover(for: .memory, item: item), bounds, .memory)
+            }
         } else {
-            return defaultHoverType
+            return (mgr.popover(for: defaultHoverType, item: item), bounds, .none)
         }
     }
 }

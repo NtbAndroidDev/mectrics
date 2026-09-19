@@ -476,15 +476,6 @@ public struct CompactInteractiveRow<DetailContent: View>: View {
             .onHover { hovering in
                 isHovered = hovering
                 onHoverChanged?(hovering)
-                if hovering, let type = hoverMetricType {
-                    if let window = NSApp.keyWindow {
-                        let mouse = NSEvent.mouseLocation
-                        let rect = NSRect(x: window.frame.minX, y: mouse.y - 12, width: window.frame.width, height: 24)
-                        HoverDetailWindowController.shared.mouseEnteredRow(type: type, screenRect: rect)
-                    }
-                } else if !hovering {
-                    HoverDetailWindowController.shared.mouseExitedAnchor()
-                }
             }
             .onTapGesture {
                 onTogglePin()

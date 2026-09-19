@@ -68,9 +68,9 @@ public struct MenuBarItemView: View {
                 }
             }
         }
-        .padding(.horizontal, isActive ? 5 : 2)
-        .padding(.vertical, isActive ? 2 : 0)
-        .background(isActive ? Color.white.opacity(0.18) : Color.clear)
+        .padding(.horizontal, 4)
+        .padding(.vertical, 1)
+        .background(isActive ? Color.white.opacity(0.20) : Color.clear)
         .clipShape(Capsule())
     }
 }
@@ -79,11 +79,13 @@ public struct DualStackedMenuBarView: View {
     public let cpuUsage: Double
     public let memUsage: Double
     public var isActive: Bool
+    public var activeSegment: UnifiedSegment
     
-    public init(cpuUsage: Double, memUsage: Double, isActive: Bool = false) {
+    public init(cpuUsage: Double, memUsage: Double, isActive: Bool = false, activeSegment: UnifiedSegment = .none) {
         self.cpuUsage = cpuUsage
         self.memUsage = memUsage
         self.isActive = isActive
+        self.activeSegment = activeSegment
     }
     
     public var body: some View {
@@ -110,6 +112,9 @@ public struct DualStackedMenuBarView: View {
                     .monospacedDigit()
                     .foregroundStyle(cpuUsage > 75.0 ? MectricsTheme.coral : .white)
             }
+            .padding(.horizontal, activeSegment == .cpu ? 2 : 0)
+            .background(activeSegment == .cpu ? Color.white.opacity(0.2) : Color.clear)
+            .clipShape(RoundedRectangle(cornerRadius: 2))
             
             // RAM line
             HStack(spacing: 2.5) {
@@ -133,11 +138,14 @@ public struct DualStackedMenuBarView: View {
                     .monospacedDigit()
                     .foregroundStyle(memUsage > 80.0 ? MectricsTheme.coral : .white)
             }
+            .padding(.horizontal, activeSegment == .memory ? 2 : 0)
+            .background(activeSegment == .memory ? Color.white.opacity(0.2) : Color.clear)
+            .clipShape(RoundedRectangle(cornerRadius: 2))
         }
-        .padding(.horizontal, isActive ? 5 : 2)
-        .padding(.vertical, isActive ? 2 : 0)
-        .background(isActive ? Color.white.opacity(0.18) : Color.clear)
-        .clipShape(RoundedRectangle(cornerRadius: 4))
+        .padding(.horizontal, 3)
+        .padding(.vertical, 1)
+        .background(isActive ? Color.white.opacity(0.20) : Color.clear)
+        .clipShape(RoundedRectangle(cornerRadius: 3.5))
     }
 }
 
@@ -187,9 +195,9 @@ public struct NetworkMenuBarView: View {
                 }
             }
         }
-        .padding(.horizontal, isActive ? 6 : 2)
-        .padding(.vertical, isActive ? 2 : 0)
-        .background(isActive ? Color.white.opacity(0.18) : Color.clear)
+        .padding(.horizontal, 4)
+        .padding(.vertical, 1)
+        .background(isActive ? Color.white.opacity(0.20) : Color.clear)
         .clipShape(Capsule())
     }
     
@@ -217,22 +225,31 @@ public struct CompactHealthBarView: View {
         Image(systemName: statusLevel == .good ? "checkmark.shield.fill" : "exclamationmark.shield.fill")
             .font(.system(size: 12.5, weight: .medium))
             .foregroundStyle(statusLevel == .good ? MectricsTheme.coral : Color.red)
-            .padding(.horizontal, isActive ? 6 : 3)
-            .padding(.vertical, isActive ? 2 : 0)
-            .background(isActive ? Color.white.opacity(0.18) : Color.clear)
+            .padding(.horizontal, 4)
+            .padding(.vertical, 1)
+            .background(isActive ? Color.white.opacity(0.20) : Color.clear)
             .clipShape(Capsule())
     }
+}
+
+public enum UnifiedSegment: Sendable {
+    case none
+    case master
+    case cpu
+    case memory
 }
 
 public struct UnifiedSampleMenuBarView: View {
     public let cpuUsage: Double
     public let memUsage: Double
     public var isActive: Bool
+    public var activeSegment: UnifiedSegment
     
-    public init(cpuUsage: Double, memUsage: Double, isActive: Bool = false) {
+    public init(cpuUsage: Double, memUsage: Double, isActive: Bool = false, activeSegment: UnifiedSegment = .none) {
         self.cpuUsage = cpuUsage
         self.memUsage = memUsage
         self.isActive = isActive
+        self.activeSegment = activeSegment
     }
     
     public var body: some View {
@@ -242,7 +259,7 @@ public struct UnifiedSampleMenuBarView: View {
                 RoundedRectangle(cornerRadius: 4)
                     .fill(
                         LinearGradient(
-                            colors: [Color(white: 0.22), Color(white: 0.13)],
+                            colors: activeSegment == .master ? [Color(white: 0.32), Color(white: 0.20)] : [Color(white: 0.22), Color(white: 0.13)],
                             startPoint: .top,
                             endPoint: .bottom
                         )
@@ -251,49 +268,56 @@ public struct UnifiedSampleMenuBarView: View {
                         RoundedRectangle(cornerRadius: 4)
                             .stroke(
                                 LinearGradient(
-                                    colors: [Color.white.opacity(0.35), Color.white.opacity(0.1)],
+                                    colors: activeSegment == .master ? [MectricsTheme.coral, MectricsTheme.coral.opacity(0.5)] : [Color.white.opacity(0.35), Color.white.opacity(0.1)],
                                     startPoint: .top,
                                     endPoint: .bottom
                                 ),
-                                lineWidth: 0.8
+                                lineWidth: activeSegment == .master ? 1.2 : 0.8
                             )
                     )
                 Text("M")
                     .font(.system(size: 10, weight: .black, design: .rounded))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(activeSegment == .master ? MectricsTheme.coral : .white)
                     .shadow(color: Color.black.opacity(0.4), radius: 0.5, y: 0.5)
             }
             .frame(width: 17, height: 17)
             
             // CPU & RAM Text metrics with intelligent status coloring
-            HStack(spacing: 6.5) {
+            HStack(spacing: 5) {
                 let isCpuHigh = cpuUsage > 80.0
                 HStack(spacing: 2) {
                     Text("CPU")
                         .font(.system(size: 9.5, weight: .semibold, design: .monospaced))
-                        .foregroundStyle(isCpuHigh ? MectricsTheme.coral.opacity(0.9) : Color.white.opacity(0.65))
+                        .foregroundStyle(isCpuHigh ? MectricsTheme.coral.opacity(0.9) : (activeSegment == .cpu ? .white : Color.white.opacity(0.65)))
                     Text(String(format: "%.0f%%", cpuUsage))
                         .font(.system(size: 10.5, weight: .bold, design: .monospaced))
                         .monospacedDigit()
                         .foregroundStyle(isCpuHigh ? MectricsTheme.coral : .white)
                 }
+                .padding(.horizontal, activeSegment == .cpu ? 4 : 2)
+                .padding(.vertical, activeSegment == .cpu ? 1.5 : 1)
+                .background(activeSegment == .cpu ? Color.white.opacity(0.2) : Color.clear)
+                .clipShape(RoundedRectangle(cornerRadius: 3.5))
                 
                 let isMemHigh = memUsage > 85.0
                 HStack(spacing: 2) {
                     Text("RAM")
                         .font(.system(size: 9.5, weight: .semibold, design: .monospaced))
-                        .foregroundStyle(isMemHigh ? Color.orange.opacity(0.9) : Color.white.opacity(0.65))
+                        .foregroundStyle(isMemHigh ? Color.orange.opacity(0.9) : (activeSegment == .memory ? .white : Color.white.opacity(0.65)))
                     Text(String(format: "%.0f%%", memUsage))
                         .font(.system(size: 10.5, weight: .bold, design: .monospaced))
                         .monospacedDigit()
                         .foregroundStyle(isMemHigh ? Color.orange : .white)
                 }
+                .padding(.horizontal, activeSegment == .memory ? 4 : 2)
+                .padding(.vertical, activeSegment == .memory ? 1.5 : 1)
+                .background(activeSegment == .memory ? Color.white.opacity(0.2) : Color.clear)
+                .clipShape(RoundedRectangle(cornerRadius: 3.5))
             }
         }
-        .padding(.horizontal, isActive ? 6 : 4)
-        .padding(.vertical, isActive ? 2 : 0)
-        .background(isActive ? Color.white.opacity(0.18) : Color.clear)
-        .clipShape(RoundedRectangle(cornerRadius: 5))
+        .padding(.horizontal, 4)
+        .padding(.vertical, 1)
+        .background(isActive ? Color.white.opacity(0.20) : Color.clear)
+        .clipShape(RoundedRectangle(cornerRadius: 4))
     }
 }
-

@@ -19,7 +19,34 @@
 
 **Mectrics** is an ultra-fast, native macOS system monitor crafted specifically for modern Apple Silicon and Intel Macs. Built with **Swift 6, SwiftUI, and AppKit**, Mectrics provides real-time visibility into your hardware directly from the menu bar with zero telemetry, zero background network listeners, and minimal CPU footprint.
 
+<p align="center">
+  <img src="assets/menubar-preview.png" alt="Mectrics Menu Bar Live Preview" width="800" style="border-radius: 8px;">
+  <br>
+  <em>Live macOS Menu Bar widgets: CPU usage, Memory pressure, Disk storage, and Network rates with live waveforms</em>
+</p>
+
 Whether you need live per-core equalization, precise battery firmware diagnostics (cycles and mAh capacities), fast external drive ejection, or a headless command-line interface for your automated terminal workflows, Mectrics delivers it all in an elegant, glassmorphic interface.
+
+---
+
+## 📸 Interface Showcase
+
+<table align="center">
+  <tr>
+    <td align="center" width="50%">
+      <b>Master Dashboard Popover</b><br>
+      <img src="assets/master-dashboard.png" alt="Master Dashboard Popover" width="360" style="border-radius: 12px; margin-top: 8px;">
+      <br>
+      <em>Complete vital metrics, thermal state, and quick diagnostic utilities</em>
+    </td>
+    <td align="center" width="50%">
+      <b>Apple Silicon CPU Detail</b><br>
+      <img src="assets/cpu-popover.png" alt="CPU Popover with Per-Core Topology" width="360" style="border-radius: 12px; margin-top: 8px;">
+      <br>
+      <em>12 Cores (6P + 6E) equalizer, live load waveform, and top processes</em>
+    </td>
+  </tr>
+</table>
 
 ---
 
@@ -77,18 +104,37 @@ mectrics doctor
 mectrics alerts watch
 ```
 
-### 8. 📐 Notch & Status Bar Space Optimization (Solving Overcrowding)
-* **All-in-One Dual Stacked Mini Item (35px Slot)**: Consolidates CPU and RAM into a single vertical micro-slot (`35px` width) with dual live bar indicators and numeric percentages. Clicking it reveals the unified **Master Dashboard** popover containing all system vitals (CPU, RAM, Battery, Disk, Network, Thermals, and Quick Actions).
-* **Flexible Display Styles**:
-  * **Wide (~70px)**: Full icon, live waveform sparklines, and numeric values.
-  * **Medium (~45px)**: Clean icon and compact percentage text.
-  * **Tiny (~28px)**: Ultra-compact text-only format saving up to 65% horizontal width—specifically engineered for MacBooks with camera notches.
+### 8. 🎛️ Dynamic Menu Bar Modes & Notch Optimization
+Mectrics offers 4 distinct menu bar layouts tailored for every screen size and notch configuration:
+* **Unified Badge Mode (`[M] CPU % RAM %`)**: An elegant Apple Silicon badge with partitioned click & hover targets. Hovering or clicking on `[M]` opens the Master Dashboard, while `CPU` and `RAM` segments independently open their dedicated detail popovers.
+* **Dual Stacked Mini Item (`38px`)**: Ultra-compact vertical stack displaying dual live progress bars and numeric percentages for CPU & RAM in minimal width.
+* **Compact Health Shield**: Single dynamic shield icon displaying overall system status level, consuming near-zero menu bar real estate.
+* **Separate Modular Items**: Display dedicated slots for any combination of CPU, Memory, Disk, Network, Battery, Sensors, Fans, and GPU. Choose between **Full** (with sparklines), **Compact**, or **Minimal** display styles.
 
-### 9. 🎨 Customization & Multilingual
-* **Accent Color Picker**: Choose between Neon Coral, Sapphire Blue, Emerald Green, Electric Purple, Amber Orange, or Graphite.
-* **Bilingual Support**: Fully localized in English and Tiếng Việt.
-* **Temperature Units**: Switch between Celsius (°C) and Fahrenheit (°F).
-* **Audible Alert System**: Optional sound notifications when thresholds are crossed.
+<p align="center">
+  <img src="assets/menu-bar-modes.jpg" alt="Menu Bar Modes & Layout Options" width="800" style="border-radius: 10px; margin-top: 8px;">
+  <br>
+  <em>Engineered for zero clutter: Full Sparklines, Compact, Minimal, Dual-Stacked, and Unified layouts</em>
+</p>
+
+### 9. 🎯 Fluid Popover UX: Hover-to-Inspect & Pinning System
+* **Instant Hover-to-Inspect**: Simply glide your cursor over any menu bar icon to reveal detailed diagnostics in 50ms without clicking.
+* **Deterministic Hover Liveness (Auto-Dismiss)**: Features an ultra-lightweight 40ms cursor tracking loop that smoothly closes popovers within 160ms once the mouse leaves the interaction zone—no stuck windows, even with fast cursor movements.
+* **Click-to-Pin**: Click any status item or interact with a popover to lock it in place. Pinned popovers remain open while you browse, launch Activity Monitor, or monitor running processes. Press `ESC` or click again to dismiss.
+* **Zero Layout Shift (Rock-Solid Menu Bar)**: Every menu bar slot uses calibrated fixed dimensions with active capsule highlights (`Color.white.opacity(0.20)`). Prevents horizontal jumping or icon jitter when popovers open and close.
+* **Horizontal Scrubbing**: Rapidly glide across adjacent menu bar items (CPU $\rightarrow$ RAM $\rightarrow$ Network) to instantaneously transition between popovers with zero duplicate window artifacts.
+
+### 10. 🎨 Customization & Multilingual
+* **Accent Color Themes**: Choose between Neon Coral, Sapphire Blue, Emerald Green, Electric Purple, Amber Orange, or Slate Graphite.
+* **Bilingual Localization**: Native support for English and Tiếng Việt.
+* **Hardware Temperature Units**: Switch seamlessly between Celsius (°C) and Fahrenheit (°F).
+* **System Diagnostics & Attention Log**: Built-in diagnostics view and event logging for threshold alerts.
+
+<p align="center">
+  <img src="assets/settings-preview.png" alt="Mectrics Settings & Customization" width="800" style="border-radius: 10px; margin-top: 8px;">
+  <br>
+  <em>Comprehensive Preferences: Menu bar items, alert thresholds, themes, and CLI integrations</em>
+</p>
 
 ---
 

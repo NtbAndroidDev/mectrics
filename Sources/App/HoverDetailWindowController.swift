@@ -62,127 +62,28 @@ public final class HoverDetailWindowController: NSObject {
     }
     
     public func mouseEnteredAnchor(type: HoverDetailType, anchorView: NSView) {
-        // Only block menu bar hover if a full popover is already shown
-        let isMenuBar = anchorView.window?.className.contains("StatusBar") ?? false
-        if isMenuBar && StatusBarManager.shared.hasActivePopover {
-            return
-        }
-        
-        guard let window = anchorView.window else { return }
-        let anchorRectInWindow = anchorView.convert(anchorView.bounds, to: nil)
-        let anchorScreenRect = window.convertToScreen(anchorRectInWindow)
-        
-        mouseEnteredScreenRect(type: type, screenRect: anchorScreenRect, isSideAnchor: false)
+        // Disabled: Native Popovers are used instead to prevent duplicate windows
     }
     
     public func mouseEnteredRow(type: HoverDetailType, screenRect: NSRect) {
-        mouseEnteredScreenRect(type: type, screenRect: screenRect, isSideAnchor: true)
+        // Disabled: Native Popovers are used instead to prevent duplicate windows
     }
     
     private func mouseEnteredScreenRect(type: HoverDetailType, screenRect: NSRect, isSideAnchor: Bool) {
-        isMouseOverAnchor = true
-        cancelDismiss()
-        
-        // If already visible, switch immediately without delay
-        if panel?.alphaValue ?? 0 > 0.4 {
-            showAtScreenRect(type: type, screenRect: screenRect, isSideAnchor: isSideAnchor, animated: false)
-            return
-        }
-        
-        showTimer?.invalidate()
-        showTimer = Timer.scheduledTimer(withTimeInterval: 0.08, repeats: false) { [weak self] _ in
-            Task { @MainActor in
-                guard let self = self, self.isMouseOverAnchor else { return }
-                self.showAtScreenRect(type: type, screenRect: screenRect, isSideAnchor: isSideAnchor, animated: true)
-            }
-        }
+        // Disabled
     }
     
     public func mouseExitedAnchor() {
-        isMouseOverAnchor = false
-        showTimer?.invalidate()
-        showTimer = nil
-        scheduleDismiss(delay: 0.20)
+        hideImmediately()
     }
     
     public func show(type: HoverDetailType, anchorView: NSView, animated: Bool = true) {
-        guard let window = anchorView.window else { return }
-        let anchorRectInWindow = anchorView.convert(anchorView.bounds, to: nil)
-        let anchorScreenRect = window.convertToScreen(anchorRectInWindow)
-        showAtScreenRect(type: type, screenRect: anchorScreenRect, isSideAnchor: false, animated: animated)
+        // Disabled: Prevent duplicate windows
     }
     
     public func showAtScreenRect(type: HoverDetailType, screenRect: NSRect, isSideAnchor: Bool, animated: Bool = true) {
-        guard let panel = panel else { return }
-        
-        self.currentType = type
-        
-        // Setup SwiftUI View
-        let view = HoverDetailView(monitor: SystemMonitor.shared, type: type)
-        if let hView = hostingView {
-            hView.rootView = view
-        } else {
-            let hView = NSHostingView(rootView: view)
-            panel.contentView?.addSubview(hView)
-            hView.translatesAutoresizingMaskIntoConstraints = false
-            if let container = panel.contentView {
-                NSLayoutConstraint.activate([
-                    hView.leadingAnchor.constraint(equalTo: container.leadingAnchor),
-                    hView.trailingAnchor.constraint(equalTo: container.trailingAnchor),
-                    hView.topAnchor.constraint(equalTo: container.topAnchor),
-                    hView.bottomAnchor.constraint(equalTo: container.bottomAnchor)
-                ])
-            }
-            self.hostingView = hView
-        }
-        
-        // Position panel
-        panel.layoutIfNeeded()
-        
-        let screen = NSScreen.screens.first(where: { NSPointInRect(NSPoint(x: screenRect.midX, y: screenRect.midY), $0.frame) }) ?? NSScreen.main ?? NSScreen.screens[0]
-        let panelSize = panel.frame.size
-        
-        var targetX: CGFloat
-        var targetY: CGFloat
-        
-        if isSideAnchor {
-            // Anchor to the side of the popover row (prefer left)
-            if screenRect.minX - panelSize.width - 10 >= screen.visibleFrame.minX {
-                targetX = screenRect.minX - panelSize.width - 10
-            } else {
-                targetX = screenRect.maxX + 10
-            }
-            targetY = screenRect.midY - (panelSize.height / 2.0)
-        } else {
-            targetX = screenRect.midX - (panelSize.width / 2.0)
-            targetY = screenRect.minY - panelSize.height - 4
-        }
-        
-        let visibleFrame = screen.visibleFrame
-        if targetX < visibleFrame.minX + 8 {
-            targetX = visibleFrame.minX + 8
-        } else if targetX + panelSize.width > visibleFrame.maxX - 8 {
-            targetX = visibleFrame.maxX - panelSize.width - 8
-        }
-        
-        if targetY < visibleFrame.minY + 8 {
-            targetY = visibleFrame.minY + 8
-        } else if targetY + panelSize.height > visibleFrame.maxY - 8 {
-            targetY = visibleFrame.maxY - panelSize.height - 8
-        }
-        
-        panel.setFrameOrigin(NSPoint(x: targetX, y: targetY))
-        panel.orderFront(nil)
-        
-        if animated {
-            NSAnimationContext.runAnimationGroup { context in
-                context.duration = 0.14
-                context.timingFunction = CAMediaTimingFunction(name: .easeOut)
-                panel.animator().alphaValue = 1.0
-            }
-        } else {
-            panel.alphaValue = 1.0
-        }
+        // Disabled: Native Popovers are used exclusively
+        hideImmediately()
     }
     
     private func scheduleDismiss(delay: TimeInterval = 0.22) {
