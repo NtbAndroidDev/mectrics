@@ -237,40 +237,56 @@ public struct UnifiedSampleMenuBarView: View {
     
     public var body: some View {
         HStack(spacing: 6) {
-            // [ M ] Brand Badge (Square rounded badge matching sample mockup)
+            // [ M ] Brand Badge with Apple Silicon hardware finish
             ZStack {
-                RoundedRectangle(cornerRadius: 3.5)
-                    .fill(Color(white: 0.18))
+                RoundedRectangle(cornerRadius: 4)
+                    .fill(
+                        LinearGradient(
+                            colors: [Color(white: 0.22), Color(white: 0.13)],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
+                    )
                     .overlay(
-                        RoundedRectangle(cornerRadius: 3.5)
-                            .stroke(Color.white.opacity(0.2), lineWidth: 0.8)
+                        RoundedRectangle(cornerRadius: 4)
+                            .stroke(
+                                LinearGradient(
+                                    colors: [Color.white.opacity(0.35), Color.white.opacity(0.1)],
+                                    startPoint: .top,
+                                    endPoint: .bottom
+                                ),
+                                lineWidth: 0.8
+                            )
                     )
                 Text("M")
-                    .font(.system(size: 10.5, weight: .black, design: .rounded))
+                    .font(.system(size: 10, weight: .black, design: .rounded))
                     .foregroundStyle(.white)
+                    .shadow(color: Color.black.opacity(0.4), radius: 0.5, y: 0.5)
             }
             .frame(width: 17, height: 17)
             
-            // CPU & RAM Text metrics
-            HStack(spacing: 6) {
+            // CPU & RAM Text metrics with intelligent status coloring
+            HStack(spacing: 6.5) {
+                let isCpuHigh = cpuUsage > 80.0
                 HStack(spacing: 2) {
                     Text("CPU")
-                        .font(.system(size: 10, weight: .regular, design: .monospaced))
-                        .foregroundStyle(Color.white.opacity(0.75))
+                        .font(.system(size: 9.5, weight: .semibold, design: .monospaced))
+                        .foregroundStyle(isCpuHigh ? MectricsTheme.coral.opacity(0.9) : Color.white.opacity(0.65))
                     Text(String(format: "%.0f%%", cpuUsage))
-                        .font(.system(size: 10.5, weight: .semibold, design: .monospaced))
+                        .font(.system(size: 10.5, weight: .bold, design: .monospaced))
                         .monospacedDigit()
-                        .foregroundStyle(.white)
+                        .foregroundStyle(isCpuHigh ? MectricsTheme.coral : .white)
                 }
                 
+                let isMemHigh = memUsage > 85.0
                 HStack(spacing: 2) {
                     Text("RAM")
-                        .font(.system(size: 10, weight: .regular, design: .monospaced))
-                        .foregroundStyle(Color.white.opacity(0.75))
+                        .font(.system(size: 9.5, weight: .semibold, design: .monospaced))
+                        .foregroundStyle(isMemHigh ? Color.orange.opacity(0.9) : Color.white.opacity(0.65))
                     Text(String(format: "%.0f%%", memUsage))
-                        .font(.system(size: 10.5, weight: .semibold, design: .monospaced))
+                        .font(.system(size: 10.5, weight: .bold, design: .monospaced))
                         .monospacedDigit()
-                        .foregroundStyle(.white)
+                        .foregroundStyle(isMemHigh ? Color.orange : .white)
                 }
             }
         }

@@ -38,6 +38,17 @@ public final class HoverDetailWindowController: NSObject {
         
         let container = HoverPanelContainerView(frame: p.contentView?.bounds ?? .zero)
         container.autoresizingMask = [.width, .height]
+        
+        let visualEffect = NSVisualEffectView(frame: container.bounds)
+        visualEffect.material = .hudWindow
+        visualEffect.blendingMode = .behindWindow
+        visualEffect.state = .active
+        visualEffect.wantsLayer = true
+        visualEffect.layer?.cornerRadius = 14
+        visualEffect.layer?.masksToBounds = true
+        visualEffect.autoresizingMask = [.width, .height]
+        container.addSubview(visualEffect, positioned: .below, relativeTo: nil)
+        
         container.onMouseEntered = { [weak self] in
             self?.isMouseOverPanel = true
             self?.cancelDismiss()
