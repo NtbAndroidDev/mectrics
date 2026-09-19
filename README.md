@@ -10,6 +10,7 @@
   <a href="#key-features"><img src="https://img.shields.io/badge/Architecture-Apple%20Silicon%20(M1--M4)%20%2B%20Intel-coral" alt="Architecture"></a>
   <a href="#key-features"><img src="https://img.shields.io/badge/Swift-6.0-orange?logo=swift" alt="Swift 6"></a>
   <a href="#privacy--offline-guarantee"><img src="https://img.shields.io/badge/Privacy-Zero%20Network%20Requests-emerald?logo=shield" alt="Privacy"></a>
+  <a href="https://www.buymeacoffee.com/ntb1nh" target="_blank"><img src="https://img.shields.io/badge/Buy%20Me%20a%20Coffee-ntb1nh-FFDD00?logo=buy-me-a-coffee&logoColor=black" alt="Buy Me A Coffee"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue" alt="License"></a>
 </p>
 
@@ -188,6 +189,18 @@ Mectrics respects your system. To completely remove the application and all asso
 1. Open **Mectrics Settings → General**.
 2. Click **"Uninstall Mectrics…"**.
 3. Mectrics will automatically unregister Login Items, clean `/usr/local/bin/mectrics`, reset `UserDefaults`, and cleanly terminate.
+
+---
+
+## ☕ Support the Project
+
+If you enjoy using **Mectrics** and it saves you time, consider buying me a coffee! Your support directly helps keep this open-source project actively maintained, ad-free, and continuously updated with native macOS features. Every cup keeps the code flowing! ☕🚀
+
+<p align="center">
+  <a href="https://www.buymeacoffee.com/ntb1nh" target="_blank">
+    <img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy Me A Coffee" height="48" style="border-radius: 8px;">
+  </a>
+</p>
 
 ---
 

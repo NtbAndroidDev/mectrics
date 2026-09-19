@@ -1128,6 +1128,52 @@ public struct SettingsView: View {
                 RoundedRectangle(cornerRadius: 8)
                     .stroke(Color.red.opacity(0.2), lineWidth: 1)
             )
+            // Support the Project (Buy Me a Coffee)
+            VStack(alignment: .leading, spacing: 10) {
+                HStack(spacing: 8) {
+                    Image(systemName: "cup.and.saucer.fill")
+                        .font(.system(size: 14, weight: .bold))
+                        .foregroundStyle(Color(red: 1.0, green: 0.86, blue: 0.0))
+                    Text(locManager.currentLanguage == .vietnamese ? "Ủng hộ tác giả" : "Support the Developer")
+                        .font(.system(size: 13, weight: .bold))
+                        .foregroundStyle(.white)
+                    Spacer()
+                }
+                
+                Text(locManager.currentLanguage == .vietnamese
+                     ? "Mectrics hoàn toàn miễn phí, mã nguồn mở và không có quảng cáo. Mời tác giả một tách cà phê để tiếp thêm năng lượng duy trì và phát triển tính năng mới!"
+                     : "Mectrics is 100% free, open-source, and ad-free. Every cup of coffee helps keep the code flowing and supports active maintenance!")
+                    .font(.system(size: 11))
+                    .foregroundStyle(MectricsTheme.textSecondary)
+                
+                Button {
+                    if let url = URL(string: "https://www.buymeacoffee.com/ntb1nh") {
+                        NSWorkspace.shared.open(url)
+                    }
+                } label: {
+                    HStack(spacing: 6) {
+                        Image(systemName: "heart.fill")
+                            .font(.system(size: 11))
+                            .foregroundStyle(.red)
+                        Text("Buy Me a Coffee (ntb1nh)")
+                            .font(.system(size: 12, weight: .semibold))
+                        Image(systemName: "arrow.up.right")
+                            .font(.system(size: 10, weight: .bold))
+                    }
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 3)
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(Color(red: 1.0, green: 0.86, blue: 0.0).opacity(0.92))
+                .foregroundStyle(Color.black)
+            }
+            .padding()
+            .background(Color(red: 1.0, green: 0.86, blue: 0.0).opacity(0.06))
+            .clipShape(RoundedRectangle(cornerRadius: 8))
+            .overlay(
+                RoundedRectangle(cornerRadius: 8)
+                    .stroke(Color(red: 1.0, green: 0.86, blue: 0.0).opacity(0.22), lineWidth: 1)
+            )
             
             // About
             VStack(alignment: .leading, spacing: 6) {
