@@ -125,6 +125,10 @@ public final class StatusBarManager: NSObject, NSPopoverDelegate {
         return popover
     }
     
+    public var hasActivePopover: Bool {
+        activeStatusItem != nil
+    }
+    
     public func popoverDidClose(_ notification: Notification) {
         activeStatusItem = nil
         updateAllViews()
@@ -210,7 +214,7 @@ public final class StatusBarManager: NSObject, NSPopoverDelegate {
                     isActive: uActive
                 )
             )
-            setHostingView(for: unifiedItem, hosting: &unifiedHosting, view: uView, width: uActive ? 134 : 126)
+            setHostingView(for: unifiedItem, hosting: &unifiedHosting, view: uView, width: uActive ? 134 : 126, hoverType: .master, isUnified: true)
             return
         }
         
@@ -220,7 +224,7 @@ public final class StatusBarManager: NSObject, NSPopoverDelegate {
             let chView = AnyView(
                 CompactHealthBarView(statusLevel: monitor.health.statusLevel, isActive: chActive)
             )
-            setHostingView(for: compactHealthItem, hosting: &compactHealthHosting, view: chView, width: chActive ? 28 : 22)
+            setHostingView(for: compactHealthItem, hosting: &compactHealthHosting, view: chView, width: chActive ? 28 : 22, hoverType: .master)
             return
         }
         
@@ -234,7 +238,7 @@ public final class StatusBarManager: NSObject, NSPopoverDelegate {
                     isActive: dualActive
                 )
             )
-            setHostingView(for: dualStackedItem, hosting: &dualStackedHosting, view: dualView, width: dualActive ? 42 : 36)
+            setHostingView(for: dualStackedItem, hosting: &dualStackedHosting, view: dualView, width: dualActive ? 42 : 36, hoverType: .master, isDualStacked: true)
             return
         }
         
@@ -254,7 +258,7 @@ public final class StatusBarManager: NSObject, NSPopoverDelegate {
                 )
             )
             let dWidth: CGFloat = (style == .minimal) ? (diskActive ? 38 : 32) : ((style == .compact) ? (diskActive ? 52 : 46) : (diskActive ? 64 : 56))
-            setHostingView(for: diskItem, hosting: &diskHosting, view: dView, width: dWidth)
+            setHostingView(for: diskItem, hosting: &diskHosting, view: dView, width: dWidth, hoverType: .disk)
         }
         
         // 4. Memory View
@@ -274,7 +278,7 @@ public final class StatusBarManager: NSObject, NSPopoverDelegate {
             let memWidth: CGFloat = (style == .minimal) ? (memActive ? 36 : 30) :
                 ((style == .compact) ? (memActive ? 52 : 46) :
                 (monitor.showMemorySparkline ? (memActive ? 82 : 74) : (memActive ? 58 : 50)))
-            setHostingView(for: memoryItem, hosting: &memoryHosting, view: mView, width: memWidth)
+            setHostingView(for: memoryItem, hosting: &memoryHosting, view: mView, width: memWidth, hoverType: .memory)
         }
         
         // 5. CPU View
@@ -294,7 +298,7 @@ public final class StatusBarManager: NSObject, NSPopoverDelegate {
             let cpuWidth: CGFloat = (style == .minimal) ? (cpuActive ? 36 : 30) :
                 ((style == .compact) ? (cpuActive ? 52 : 46) :
                 (monitor.showCPUSparkline ? (cpuActive ? 86 : 78) : (cpuActive ? 58 : 50)))
-            setHostingView(for: cpuItem, hosting: &cpuHosting, view: cView, width: cpuWidth)
+            setHostingView(for: cpuItem, hosting: &cpuHosting, view: cView, width: cpuWidth, hoverType: .cpu)
         }
         
         // 6. Network View
@@ -326,7 +330,7 @@ public final class StatusBarManager: NSObject, NSPopoverDelegate {
                 nWidth = (style == .minimal) ? (netActive ? 42 : 36) :
                     ((style == .compact) ? (netActive ? 56 : 48) : (netActive ? 70 : 62))
             }
-            setHostingView(for: networkItem, hosting: &networkHosting, view: nView, width: nWidth)
+            setHostingView(for: networkItem, hosting: &networkHosting, view: nView, width: nWidth, hoverType: .network)
         }
         
         // 7. Battery View
@@ -343,7 +347,7 @@ public final class StatusBarManager: NSObject, NSPopoverDelegate {
             )
             let bWidth: CGFloat = (style == .minimal) ? (batActive ? 36 : 30) :
                 ((style == .compact) ? (batActive ? 50 : 44) : (batActive ? 58 : 50))
-            setHostingView(for: batteryItem, hosting: &batteryHosting, view: bView, width: bWidth)
+            setHostingView(for: batteryItem, hosting: &batteryHosting, view: bView, width: bWidth, hoverType: .battery)
         }
         
         // 8. Sensor View
@@ -361,7 +365,7 @@ public final class StatusBarManager: NSObject, NSPopoverDelegate {
             )
             let sWidth: CGFloat = (style == .minimal) ? (senActive ? 38 : 32) :
                 ((style == .compact) ? (senActive ? 52 : 46) : (senActive ? 62 : 54))
-            setHostingView(for: sensorItem, hosting: &sensorHosting, view: sView, width: sWidth)
+            setHostingView(for: sensorItem, hosting: &sensorHosting, view: sView, width: sWidth, hoverType: .sensor)
         }
         
         // 9. Fans View
@@ -380,7 +384,7 @@ public final class StatusBarManager: NSObject, NSPopoverDelegate {
             )
             let fWidth: CGFloat = (style == .minimal) ? (fanActive ? 42 : 36) :
                 ((style == .compact) ? (fanActive ? 52 : 46) : (fanActive ? 58 : 50))
-            setHostingView(for: fansItem, hosting: &fansHosting, view: fView, width: fWidth)
+            setHostingView(for: fansItem, hosting: &fansHosting, view: fView, width: fWidth, hoverType: .fans)
         }
         
         // 10. GPU View
@@ -398,7 +402,7 @@ public final class StatusBarManager: NSObject, NSPopoverDelegate {
             )
             let gWidth: CGFloat = (style == .minimal) ? (gpuActive ? 36 : 30) :
                 ((style == .compact) ? (gpuActive ? 50 : 44) : (gpuActive ? 60 : 52))
-            setHostingView(for: gpuItem, hosting: &gpuHosting, view: gView, width: gWidth)
+            setHostingView(for: gpuItem, hosting: &gpuHosting, view: gView, width: gWidth, hoverType: .gpu)
         }
     }
     
@@ -406,14 +410,26 @@ public final class StatusBarManager: NSObject, NSPopoverDelegate {
         for item: NSStatusItem,
         hosting: inout NSHostingView<AnyView>?,
         view: AnyView,
-        width: CGFloat
+        width: CGFloat,
+        hoverType: HoverDetailType = .master,
+        isUnified: Bool = false,
+        isDualStacked: Bool = false
     ) {
         guard let button = item.button else { return }
+        button.window?.acceptsMouseMovedEvents = true
         
-        if let h = hosting {
+        if let h = hosting as? StatusItemHostingView {
             h.rootView = view
+            h.defaultHoverType = hoverType
+            h.isUnifiedMode = isUnified
+            h.isDualStacked = isDualStacked
+            h.statusButton = button
         } else {
-            let h = NSHostingView(rootView: view)
+            let h = StatusItemHostingView(rootView: view)
+            h.defaultHoverType = hoverType
+            h.isUnifiedMode = isUnified
+            h.isDualStacked = isDualStacked
+            h.statusButton = button
             button.addSubview(h)
             h.translatesAutoresizingMaskIntoConstraints = false
             NSLayoutConstraint.activate([
@@ -454,6 +470,7 @@ public final class StatusBarManager: NSObject, NSPopoverDelegate {
     @objc private func toggleGPU() { toggle(gpuPopover, for: gpuItem) }
     
     private func toggle(_ popover: NSPopover, for item: NSStatusItem) {
+        HoverDetailWindowController.shared.hideImmediately()
         guard let button = item.button else { return }
         
         let isRightClick = (NSApp.currentEvent?.type == .rightMouseUp)
@@ -588,8 +605,79 @@ public final class StatusBarManager: NSObject, NSPopoverDelegate {
     }
     
     public func closeAllPopovers() {
+        HoverDetailWindowController.shared.hideImmediately()
         [unifiedPopover, compactHealthPopover, dualStackedPopover, diskPopover, memoryPopover, cpuPopover, networkPopover, batteryPopover, sensorPopover, fansPopover, gpuPopover].forEach {
             $0?.performClose(nil)
+        }
+    }
+}
+
+// MARK: - Status Item Hosting View with Mouse Tracking for Hover Cards
+public final class StatusItemHostingView: NSHostingView<AnyView> {
+    public var defaultHoverType: HoverDetailType = .master
+    public var isUnifiedMode: Bool = false
+    public var isDualStacked: Bool = false
+    public weak var statusButton: NSStatusBarButton?
+    
+    private var trackingArea: NSTrackingArea?
+    
+    public override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        window?.acceptsMouseMovedEvents = true
+    }
+    
+    public override func updateTrackingAreas() {
+        super.updateTrackingAreas()
+        if let existing = trackingArea {
+            removeTrackingArea(existing)
+        }
+        let area = NSTrackingArea(
+            rect: bounds,
+            options: [.mouseEnteredAndExited, .mouseMoved, .activeAlways, .inVisibleRect],
+            owner: self,
+            userInfo: nil
+        )
+        addTrackingArea(area)
+        trackingArea = area
+    }
+    
+    public override func mouseEntered(with event: NSEvent) {
+        super.mouseEntered(with: event)
+        guard let button = statusButton ?? superview as? NSStatusBarButton else { return }
+        let type = resolveHoverType(at: convert(event.locationInWindow, from: nil))
+        HoverDetailWindowController.shared.mouseEnteredAnchor(type: type, anchorView: button)
+    }
+    
+    public override func mouseMoved(with event: NSEvent) {
+        super.mouseMoved(with: event)
+        guard let button = statusButton ?? superview as? NSStatusBarButton else { return }
+        let type = resolveHoverType(at: convert(event.locationInWindow, from: nil))
+        HoverDetailWindowController.shared.mouseEnteredAnchor(type: type, anchorView: button)
+    }
+    
+    public override func mouseExited(with event: NSEvent) {
+        super.mouseExited(with: event)
+        HoverDetailWindowController.shared.mouseExitedAnchor()
+    }
+    
+    private func resolveHoverType(at point: NSPoint) -> HoverDetailType {
+        if isUnifiedMode {
+            // In Unified Sample View:
+            // [M] is roughly 0..32px
+            // CPU metric is roughly 32..80px
+            // RAM metric is roughly 80..134px
+            if point.x < 32 {
+                return .master
+            } else if point.x < 80 {
+                return .cpu
+            } else {
+                return .memory
+            }
+        } else if isDualStacked {
+            // Dual stacked has CPU on top, RAM on bottom (height is ~22px)
+            return point.y > 11 ? .cpu : .memory
+        } else {
+            return defaultHoverType
         }
     }
 }
