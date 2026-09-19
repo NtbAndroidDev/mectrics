@@ -1,5 +1,6 @@
 import Foundation
 import Darwin
+import AppKit
 
 public final class DiskMonitor: DiskMonitoring, @unchecked Sendable {
     private var previousReadBytes: UInt64 = 0
@@ -135,8 +136,10 @@ public final class DiskMonitor: DiskMonitoring, @unchecked Sendable {
     }
     
     public static func ejectVolume(url: URL) {
-        NSWorkspace.shared.unmountAndEjectDevice(at: url) { error in
-            if let error = error {
+        DispatchQueue.global(qos: .userInitiated).async {
+            do {
+                try NSWorkspace.shared.unmountAndEjectDevice(at: url)
+            } catch {
                 NSLog("Failed to eject \(url.path): \(error.localizedDescription)")
             }
         }

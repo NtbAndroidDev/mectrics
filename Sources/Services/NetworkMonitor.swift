@@ -168,31 +168,40 @@ public final class NetworkMonitor: NetworkMonitoring, @unchecked Sendable {
         guard !isFetchingPublicIP && (Date().timeIntervalSince(lastPublicIPCheck) >= 300.0 || cachedPublicIP == nil) else { return }
         isFetchingPublicIP = true
         
-        DispatchQueue.global(qos: .utility).async { [weak self] in
+        Task.detached(priority: .utility) { [weak self] in
             guard let url = URL(string: "https://api.ipify.org") else {
-                self?.lock.lock()
-                self?.isFetchingPublicIP = false
-                self?.lock.unlock()
+                self?.resetPublicIPFetch()
                 return
             }
             var request = URLRequest(url: url)
             request.timeoutInterval = 3.0
             
-            let task = URLSession.shared.dataTask(with: request) { data, _, _ in
-                self?.lock.lock()
-                defer {
-                    self?.isFetchingPublicIP = false
-                    self?.lastPublicIPCheck = Date()
-                    self?.lock.unlock()
-                }
-                if let data = data,
-                   let ip = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines),
+            do {
+                let (data, _) = try await URLSession.shared.data(for: request)
+                if let ip = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines),
                    !ip.isEmpty {
-                    self?.cachedPublicIP = ip
+                    self?.updatePublicIP(ip)
+                    return
                 }
-            }
-            task.resume()
+            } catch {}
+            
+            self?.resetPublicIPFetch()
         }
+    }
+    
+    private func updatePublicIP(_ ip: String) {
+        lock.lock()
+        defer { lock.unlock() }
+        cachedPublicIP = ip
+        lastPublicIPCheck = Date()
+        isFetchingPublicIP = false
+    }
+    
+    private func resetPublicIPFetch() {
+        lock.lock()
+        defer { lock.unlock() }
+        lastPublicIPCheck = Date()
+        isFetchingPublicIP = false
     }
 
     private func measurePingInBackground() {
