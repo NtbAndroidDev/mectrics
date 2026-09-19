@@ -17,12 +17,11 @@ public struct CompactHealthPopoverView: View {
     @ObservedObject private var sleepBlocker = SleepBlocker.shared
     @State private var copiedSummaryAlert = false
     
-    // Interactive hover & pin state
-    @State private var hoveredMetric: CompactMetricType? = nil
+    // Interactive pin state
     @State private var pinnedMetric: CompactMetricType? = nil
     
     private var activeMetric: CompactMetricType? {
-        pinnedMetric ?? hoveredMetric
+        pinnedMetric
     }
     
     public init(monitor: SystemMonitor) {
@@ -61,11 +60,7 @@ public struct CompactHealthPopoverView: View {
                     value: String(format: "%.0f%%", monitor.cpu.totalUsage),
                     progress: monitor.cpu.totalUsage / 100.0,
                     isExpanded: activeMetric == .cpu,
-                    onHoverChanged: { isHovered in
-                        withAnimation(.spring(response: 0.28, dampingFraction: 0.8)) {
-                            hoveredMetric = isHovered ? .cpu : (hoveredMetric == .cpu ? nil : hoveredMetric)
-                        }
-                    },
+                    hoverMetricType: .cpu,
                     onTogglePin: {
                         withAnimation(.spring(response: 0.28, dampingFraction: 0.8)) {
                             pinnedMetric = (pinnedMetric == .cpu) ? nil : .cpu
@@ -82,11 +77,7 @@ public struct CompactHealthPopoverView: View {
                     value: String(format: "%.0f%%", monitor.memory.usagePercentage),
                     progress: monitor.memory.usagePercentage / 100.0,
                     isExpanded: activeMetric == .memory,
-                    onHoverChanged: { isHovered in
-                        withAnimation(.spring(response: 0.28, dampingFraction: 0.8)) {
-                            hoveredMetric = isHovered ? .memory : (hoveredMetric == .memory ? nil : hoveredMetric)
-                        }
-                    },
+                    hoverMetricType: .memory,
                     onTogglePin: {
                         withAnimation(.spring(response: 0.28, dampingFraction: 0.8)) {
                             pinnedMetric = (pinnedMetric == .memory) ? nil : .memory
@@ -103,11 +94,7 @@ public struct CompactHealthPopoverView: View {
                     value: formatNetworkThroughput(),
                     progress: nil,
                     isExpanded: activeMetric == .network,
-                    onHoverChanged: { isHovered in
-                        withAnimation(.spring(response: 0.28, dampingFraction: 0.8)) {
-                            hoveredMetric = isHovered ? .network : (hoveredMetric == .network ? nil : hoveredMetric)
-                        }
-                    },
+                    hoverMetricType: .network,
                     onTogglePin: {
                         withAnimation(.spring(response: 0.28, dampingFraction: 0.8)) {
                             pinnedMetric = (pinnedMetric == .network) ? nil : .network
@@ -124,11 +111,7 @@ public struct CompactHealthPopoverView: View {
                     value: String(format: "%.0f%%", monitor.disk.usagePercentage),
                     progress: monitor.disk.usagePercentage / 100.0,
                     isExpanded: activeMetric == .disk,
-                    onHoverChanged: { isHovered in
-                        withAnimation(.spring(response: 0.28, dampingFraction: 0.8)) {
-                            hoveredMetric = isHovered ? .disk : (hoveredMetric == .disk ? nil : hoveredMetric)
-                        }
-                    },
+                    hoverMetricType: .disk,
                     onTogglePin: {
                         withAnimation(.spring(response: 0.28, dampingFraction: 0.8)) {
                             pinnedMetric = (pinnedMetric == .disk) ? nil : .disk
@@ -146,11 +129,7 @@ public struct CompactHealthPopoverView: View {
                         value: String(format: "%.0f%%", monitor.battery.percentage),
                         progress: monitor.battery.percentage / 100.0,
                         isExpanded: activeMetric == .battery,
-                        onHoverChanged: { isHovered in
-                            withAnimation(.spring(response: 0.28, dampingFraction: 0.8)) {
-                                hoveredMetric = isHovered ? .battery : (hoveredMetric == .battery ? nil : hoveredMetric)
-                            }
-                        },
+                        hoverMetricType: .battery,
                         onTogglePin: {
                             withAnimation(.spring(response: 0.28, dampingFraction: 0.8)) {
                                 pinnedMetric = (pinnedMetric == .battery) ? nil : .battery
@@ -168,11 +147,7 @@ public struct CompactHealthPopoverView: View {
                     value: "\(Int(monitor.sensor.cpuTemperature))°C",
                     progress: max(0.0, min(1.0, (monitor.sensor.cpuTemperature - 30.0) / 70.0)),
                     isExpanded: activeMetric == .temperature,
-                    onHoverChanged: { isHovered in
-                        withAnimation(.spring(response: 0.28, dampingFraction: 0.8)) {
-                            hoveredMetric = isHovered ? .temperature : (hoveredMetric == .temperature ? nil : hoveredMetric)
-                        }
-                    },
+                    hoverMetricType: .sensor,
                     onTogglePin: {
                         withAnimation(.spring(response: 0.28, dampingFraction: 0.8)) {
                             pinnedMetric = (pinnedMetric == .temperature) ? nil : .temperature
@@ -415,18 +390,41 @@ public struct CompactHealthPopoverView: View {
     }
 }
 
-// MARK: - Interactive Row Component with Hover Drawer
+// MARK: - Interactive Row Component with Hover Detail Window
 public struct CompactInteractiveRow<DetailContent: View>: View {
     public let icon: String
     public let title: String
     public let value: String
     public var progress: Double? = nil
     public var isExpanded: Bool
-    public var onHoverChanged: (Bool) -> Void
+    public var hoverMetricType: HoverDetailType? = nil
+    public var onHoverChanged: ((Bool) -> Void)? = nil
     public var onTogglePin: () -> Void
     @ViewBuilder public let detailContent: () -> DetailContent
     
     @State private var isHovered = false
+    
+    public init(
+        icon: String,
+        title: String,
+        value: String,
+        progress: Double? = nil,
+        isExpanded: Bool,
+        hoverMetricType: HoverDetailType? = nil,
+        onHoverChanged: ((Bool) -> Void)? = nil,
+        onTogglePin: @escaping () -> Void,
+        @ViewBuilder detailContent: @escaping () -> DetailContent
+    ) {
+        self.icon = icon
+        self.title = title
+        self.value = value
+        self.progress = progress
+        self.isExpanded = isExpanded
+        self.hoverMetricType = hoverMetricType
+        self.onHoverChanged = onHoverChanged
+        self.onTogglePin = onTogglePin
+        self.detailContent = detailContent
+    }
     
     public var body: some View {
         VStack(spacing: 0) {
@@ -477,7 +475,16 @@ public struct CompactInteractiveRow<DetailContent: View>: View {
             .contentShape(Rectangle())
             .onHover { hovering in
                 isHovered = hovering
-                onHoverChanged(hovering)
+                onHoverChanged?(hovering)
+                if hovering, let type = hoverMetricType {
+                    if let window = NSApp.keyWindow {
+                        let mouse = NSEvent.mouseLocation
+                        let rect = NSRect(x: window.frame.minX, y: mouse.y - 12, width: window.frame.width, height: 24)
+                        HoverDetailWindowController.shared.mouseEnteredRow(type: type, screenRect: rect)
+                    }
+                } else if !hovering {
+                    HoverDetailWindowController.shared.mouseExitedAnchor()
+                }
             }
             .onTapGesture {
                 onTogglePin()
