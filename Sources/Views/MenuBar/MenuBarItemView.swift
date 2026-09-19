@@ -47,7 +47,7 @@ public struct MenuBarItemView: View {
                         maxScale: 100.0
                     )
                     .frame(width: 24, height: 11)
-                    .background(Color(red: 0.22, green: 0.08, blue: 0.12))
+                    .background(tintColor.opacity(0.18))
                     .clipShape(RoundedRectangle(cornerRadius: 2.5))
                 } else {
                     // Smooth live waveform for CPU
@@ -143,9 +143,9 @@ public struct CompactHealthBarView: View {
     }
     
     public var body: some View {
-        Image(systemName: "checkmark.shield")
-            .font(.system(size: 13, weight: .regular))
-            .foregroundStyle(statusLevel == .good ? .white : MectricsTheme.coral)
+        Image(systemName: statusLevel == .good ? "checkmark.shield.fill" : "exclamationmark.shield.fill")
+            .font(.system(size: 12.5, weight: .medium))
+            .foregroundStyle(statusLevel == .good ? MectricsTheme.coral : Color.red)
             .padding(.horizontal, isActive ? 6 : 3)
             .padding(.vertical, isActive ? 2 : 0)
             .background(isActive ? Color.white.opacity(0.18) : Color.clear)

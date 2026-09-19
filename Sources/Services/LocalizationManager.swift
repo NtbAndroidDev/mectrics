@@ -52,6 +52,11 @@ public final class LocalizationManager: ObservableObject {
         // CPU
         case "Cores": return isVi ? "Số nhân" : "Cores"
         case "Busiest core": return isVi ? "Nhân bận nhất" : "Busiest core"
+        case "Core Activity": return isVi ? "Hoạt động từng nhân" : "Core Activity"
+        case "Performance Cores (P)": return isVi ? "Nhân hiệu năng cao (P-Cores)" : "Performance Cores (P)"
+        case "Efficiency Cores (E)": return isVi ? "Nhân tiết kiệm điện (E-Cores)" : "Efficiency Cores (E)"
+        case "P-Cores": return isVi ? "Nhân P" : "P-Cores"
+        case "E-Cores": return isVi ? "Nhân E" : "E-Cores"
         case "Temperature": return isVi ? "Nhiệt độ" : "Temperature"
         case "Uptime": return isVi ? "Thời gian chạy" : "Uptime"
         case "Top processes": return isVi ? "Tiến trình chiếm nhiều CPU" : "Top processes"
@@ -64,8 +69,19 @@ public final class LocalizationManager: ObservableObject {
         case "Free": return isVi ? "Còn trống" : "Free"
         case "Purgeable": return isVi ? "Có thể giải phóng" : "Purgeable"
         case "Total": return isVi ? "Tổng cộng" : "Total"
+        case "Trash": return isVi ? "Thùng rác" : "Trash"
+        case "Empty Trash": return isVi ? "Dọn sạch Thùng rác" : "Empty Trash"
+        case "Emptying Trash...": return isVi ? "Đang dọn Thùng rác..." : "Emptying Trash..."
         case "Read": return isVi ? "Tốc độ đọc" : "Read"
         case "Write": return isVi ? "Tốc độ ghi" : "Write"
+        case "Read (Disk I/O)": return isVi ? "Tốc độ đọc ổ đĩa" : "Read (Disk I/O)"
+        case "Write (Disk I/O)": return isVi ? "Tốc độ ghi ổ đĩa" : "Write (Disk I/O)"
+        case "Volume": return isVi ? "Phân vùng" : "Volume"
+        case "Mounted Volumes": return isVi ? "Các ổ đĩa & phân vùng" : "Mounted Volumes"
+        case "Internal": return isVi ? "Ổ trong" : "Internal"
+        case "External / Removable": return isVi ? "Ổ gắn ngoài" : "External / Removable"
+        case "Eject": return isVi ? "Ngắt ổ đĩa" : "Eject"
+        case "Open Disk Utility": return isVi ? "Mở Tiện ích Ổ đĩa" : "Open Disk Utility"
         case "Open Storage Settings": return isVi ? "Mở Cài đặt Dung lượng" : "Open Storage Settings"
         
         // Memory
@@ -75,21 +91,38 @@ public final class LocalizationManager: ObservableObject {
         case "Cached Files": return isVi ? "Bộ đệm tệp" : "Cached Files"
         case "Total RAM": return isVi ? "Tổng dung lượng RAM" : "Total RAM"
         case "Swap Used": return isVi ? "Hoán đổi Swap" : "Swap Used"
+        case "Memory Trend": return isVi ? "Xu hướng bộ nhớ (30s)" : "Memory Trend (30s)"
+        case "Memory Pressure": return isVi ? "Áp lực bộ nhớ" : "Memory Pressure"
+        case "Top memory consumers": return isVi ? "Tiến trình chiếm nhiều RAM" : "Top memory consumers"
+        case "Stopped": return isVi ? "Đã dừng" : "Stopped"
         case "App": return isVi ? "Ứng dụng" : "App"
         case "Wired": return isVi ? "Cố định" : "Wired"
         case "Cached": return isVi ? "Bộ đệm" : "Cached"
+        case "Active": return isVi ? "Đang kết nối" : "Connected"
         
         // Network
         case "Download (Inbound)": return isVi ? "Tải xuống (Inbound)" : "Download (Inbound)"
         case "Upload (Outbound)": return isVi ? "Tải lên (Outbound)" : "Upload (Outbound)"
         case "Interface": return isVi ? "Giao diện mạng" : "Interface"
         case "IP Address": return isVi ? "Địa chỉ IP" : "IP Address"
+        case "Public IP": return isVi ? "IP Công cộng" : "Public IP"
+        case "Gateway IP": return isVi ? "Địa chỉ Cổng (Gateway)" : "Gateway IP"
+        case "Wi-Fi Signal": return isVi ? "Tín hiệu Wi-Fi" : "Wi-Fi Signal"
+        case "Link Speed": return isVi ? "Tốc độ kết nối" : "Link Speed"
         case "Total Downloaded": return isVi ? "Tổng tải xuống" : "Total Downloaded"
         case "Total Uploaded": return isVi ? "Tổng tải lên" : "Total Uploaded"
+        case "Ping Latency": return isVi ? "Độ trễ mạng (Ping)" : "Ping Latency"
+        case "Flush DNS Cache": return isVi ? "Xoá bộ đệm DNS" : "Flush DNS Cache"
+        case "Flushing DNS...": return isVi ? "Đang xoá DNS..." : "Flushing DNS..."
+        case "DNS Cache Flushed!": return isVi ? "Đã xoá bộ đệm DNS!" : "DNS Cache Flushed!"
         case "Open Network Settings": return isVi ? "Mở Cài đặt Mạng" : "Open Network Settings"
         
         // Battery
         case "Power Source": return isVi ? "Nguồn điện" : "Power Source"
+        case "Power Draw": return isVi ? "Công suất tiêu thụ" : "Power Draw"
+        case "Low Power Mode": return isVi ? "Chế độ Nguồn điện thấp" : "Low Power Mode"
+        case "Enabled": return isVi ? "Bật" : "Enabled"
+        case "Disabled": return isVi ? "Tắt" : "Disabled"
         case "State": return isVi ? "Trạng thái" : "State"
         case "Charging": return isVi ? "Đang sạc" : "Charging"
         case "Plugged In": return isVi ? "Đã cắm sạc" : "Plugged In"
@@ -98,6 +131,10 @@ public final class LocalizationManager: ObservableObject {
         case "Time to Full": return isVi ? "Thời gian sạc đầy" : "Time to Full"
         case "Health Capacity": return isVi ? "Dung lượng tối đa" : "Health Capacity"
         case "Cycle Count": return isVi ? "Số chu kỳ sạc" : "Cycle Count"
+        case "Design Capacity": return isVi ? "Dung lượng thiết kế" : "Design Capacity"
+        case "Full Charge Capacity": return isVi ? "Dung lượng sạc đầy" : "Full Charge Capacity"
+        case "Remaining Capacity": return isVi ? "Dung lượng hiện có" : "Remaining Capacity"
+        case "Charger Power": return isVi ? "Công suất củ sạc" : "Charger Power"
         case "Condition": return isVi ? "Tình trạng pin" : "Condition"
         case "Open Battery Settings": return isVi ? "Mở Cài đặt Pin" : "Open Battery Settings"
         
@@ -105,18 +142,36 @@ public final class LocalizationManager: ObservableObject {
         case "CPU Temperature": return isVi ? "Nhiệt độ CPU" : "CPU Temperature"
         case "GPU Temperature": return isVi ? "Nhiệt độ GPU" : "GPU Temperature"
         case "Thermal Pressure": return isVi ? "Áp lực nhiệt" : "Thermal Pressure"
+        case "Nominal": return isVi ? "Bình thường (Mát mẻ)" : "Nominal"
+        case "Fair": return isVi ? "Vừa phải" : "Fair"
+        case "Serious": return isVi ? "Nghiêm trọng (Nóng)" : "Serious"
+        case "Critical": return isVi ? "Nguy cấp (Quá nhiệt)" : "Critical"
         case "Cooling Fan": return isVi ? "Quạt làm mát" : "Cooling Fan"
         case "Cooling Architecture": return isVi ? "Kiến trúc làm mát" : "Cooling Architecture"
         case "Fanless / Passive": return isVi ? "Tản nhiệt thụ động (Không quạt)" : "Fanless / Passive"
         case "Processor": return isVi ? "Bộ xử lý" : "Processor"
         case "Working Set VRAM": return isVi ? "VRAM đang dùng" : "Working Set VRAM"
         case "Total Metal VRAM": return isVi ? "Tổng VRAM Metal" : "Total Metal VRAM"
+        case "VRAM Allocation": return isVi ? "Phân bổ VRAM" : "VRAM Allocation"
         case "Open Displays Settings": return isVi ? "Mở Cài đặt Màn hình" : "Open Displays Settings"
         
         // Compact Health Actions
+        case "Keep Awake: Active": return isVi ? "Chống ngủ: Đang bật" : "Keep Awake: Active"
+        case "Keep Awake: Off": return isVi ? "Chống ngủ máy: Đang tắt" : "Keep Awake: Off"
         case "Open Attention Log": return isVi ? "Mở Nhật ký Cảnh báo" : "Open Attention Log"
+        case "Attention Log": return isVi ? "Nhật ký Cảnh báo" : "Attention Log"
+        case "Done": return isVi ? "Xong" : "Done"
+        case "No active alerts or events": return isVi ? "Không có cảnh báo hoặc sự kiện nào" : "No active alerts or events"
         case "Copy System Summary": return isVi ? "Sao chép Tóm tắt Hệ thống" : "Copy System Summary"
         case "Summary Copied!": return isVi ? "Đã sao chép Tóm tắt!" : "Summary Copied!"
+        case "Purge Memory Cache": return isVi ? "Giải phóng Bộ nhớ đệm" : "Purge Memory Cache"
+        case "Purging...": return isVi ? "Đang giải phóng..." : "Purging..."
+        case "Purged!": return isVi ? "Đã giải phóng!" : "Purged!"
+        case "Copied!": return isVi ? "Đã sao chép!" : "Copied!"
+        case "Click to copy": return isVi ? "Nhấn để sao chép" : "Click to copy"
+        case "Attention Log...": return isVi ? "Nhật ký Cảnh báo..." : "Attention Log..."
+        case "Mectrics Settings...": return isVi ? "Cài đặt Mectrics..." : "Mectrics Settings..."
+        case "Quit Mectrics": return isVi ? "Thoát Mectrics" : "Quit Mectrics"
         
         // Footer
         case "Settings": return isVi ? "Cài đặt" : "Settings"
@@ -187,6 +242,60 @@ public final class LocalizationManager: ObservableObject {
             return isVi ? "macOS quản lý quyền thông báo. Mectrics chỉ có thể hiển thị cảnh báo khi bạn cấp quyền trong Cài đặt Hệ thống."
                         : "macOS owns notification permission and decides how alerts are presented. Mectrics cannot show one until you allow it there."
             
+        // Fans & Cooling
+        case "Cooling Fans": return isVi ? "Quạt tản nhiệt" : "Cooling Fans"
+        case "Idle / Passive": return isVi ? "Tĩnh lặng / Thụ động" : "Idle / Passive"
+        case "Fanless Architecture": return isVi ? "Thiết kế Không quạt" : "Fanless Architecture"
+        case "This Mac is passively cooled with zero mechanical noise.":
+            return isVi ? "Chiếc Mac này được tản nhiệt thụ động hoàn toàn êm ái, không có tiếng ồn cơ học."
+                        : "This Mac is passively cooled with zero mechanical noise."
+        case "Thermal State": return isVi ? "Trạng thái nhiệt" : "Thermal State"
+        case "CPU Thermal Zone": return isVi ? "Vùng nhiệt CPU" : "CPU Thermal Zone"
+        case "GPU Thermal Zone": return isVi ? "Vùng nhiệt GPU" : "GPU Thermal Zone"
+            
+        // Diagnostics
+        case "System Diagnostics": return isVi ? "Chẩn đoán Hệ thống" : "System Diagnostics"
+        case "System Diagnostics...": return isVi ? "Chẩn đoán Hệ thống..." : "System Diagnostics..."
+        case "Open System Diagnostics…": return isVi ? "Mở Chẩn đoán Hệ thống…" : "Open System Diagnostics…"
+        case "Copy Diagnostics": return isVi ? "Sao chép Báo cáo" : "Copy Diagnostics"
+        case "Export...": return isVi ? "Xuất tệp..." : "Export..."
+        case "Hardware & Operating System": return isVi ? "Phần cứng & Hệ điều hành" : "Hardware & Operating System"
+        case "Model Identifier": return isVi ? "Mã định danh máy" : "Model Identifier"
+        case "macOS Version": return isVi ? "Phiên bản macOS" : "macOS Version"
+        case "Kernel Version": return isVi ? "Phiên bản Kernel" : "Kernel Version"
+        case "System Uptime": return isVi ? "Thời gian hoạt động" : "System Uptime"
+        case "Privacy Status": return isVi ? "Tình trạng Quyền riêng tư" : "Privacy Status"
+        case "100% Offline / Zero Telemetry": return isVi ? "100% Ngoại tuyến / Không gửi Telemetry" : "100% Offline / Zero Telemetry"
+        case "Chip": return isVi ? "Bộ vi xử lý Chip" : "Chip"
+        case "Cores Count": return isVi ? "Số lượng nhân" : "Cores Count"
+        case "Current Total Usage": return isVi ? "Tổng mức sử dụng hiện tại" : "Current Total Usage"
+        case "Load Average": return isVi ? "Tải trung bình (Load Avg)" : "Load Average"
+        case "Physical Memory": return isVi ? "Bộ nhớ Vật lý" : "Physical Memory"
+        case "RAM Utilization": return isVi ? "Hiệu suất sử dụng RAM" : "RAM Utilization"
+        case "Battery Charge": return isVi ? "Mức sạc pin" : "Battery Charge"
+        case "Maximum Capacity": return isVi ? "Dung lượng tối đa" : "Maximum Capacity"
+        case "Storage Volume": return isVi ? "Phân vùng Lưu trữ" : "Storage Volume"
+        case "Volume Path": return isVi ? "Đường dẫn phân vùng" : "Volume Path"
+        case "Space Breakdown": return isVi ? "Phân bố dung lượng" : "Space Breakdown"
+        case "Disk Utilization": return isVi ? "Tỷ lệ chiếm dụng ổ đĩa" : "Disk Utilization"
+        case "Network Interfaces": return isVi ? "Giao diện Mạng" : "Network Interfaces"
+        case "Current Download": return isVi ? "Tốc độ tải xuống" : "Current Download"
+        case "Current Upload": return isVi ? "Tốc độ tải lên" : "Current Upload"
+        case "DNS Ping Latency": return isVi ? "Độ trễ DNS Ping" : "DNS Ping Latency"
+        case "Cooling Type": return isVi ? "Loại làm mát" : "Cooling Type"
+        case "Passive Fanless Architecture": return isVi ? "Kiến trúc Tản nhiệt Thụ động" : "Passive Fanless Architecture"
+            
+        // Settings Extra
+        case "Temperature Unit": return isVi ? "Đơn vị Nhiệt độ" : "Temperature Unit"
+        case "Alert Behavior & Delivery": return isVi ? "Cách thức & Hành vi Cảnh báo" : "Alert Behavior & Delivery"
+        case "Play audible alert sound when condition triggers":
+            return isVi ? "Phát âm thanh chuông khi điều kiện cảnh báo xảy ra"
+                        : "Play audible alert sound when condition triggers"
+        case "Headless Automation CLI": return isVi ? "Bộ công cụ CLI Tự động hoá" : "Headless Automation CLI"
+        case "Install CLI (/usr/local/bin/mectrics)": return isVi ? "Cài đặt CLI (/usr/local/bin/mectrics)" : "Install CLI (/usr/local/bin/mectrics)"
+        case "Uninstall Mectrics": return isVi ? "Gỡ cài đặt Mectrics" : "Uninstall Mectrics"
+        case "Uninstall Mectrics…": return isVi ? "Gỡ cài đặt Mectrics…" : "Uninstall Mectrics…"
+            
         default:
             return key
         }
@@ -194,6 +303,7 @@ public final class LocalizationManager: ObservableObject {
 }
 
 extension View {
+    @MainActor
     public func loc(_ key: String) -> String {
         LocalizationManager.shared.t(key)
     }

@@ -3,6 +3,9 @@ import AppKit
 
 public struct MemoryPopoverView: View {
     @ObservedObject var monitor: SystemMonitor
+    @State private var isPurging = false
+    @State private var purgedSuccess = false
+    @State private var showTopProcesses = false
     
     public init(monitor: SystemMonitor) {
         self.monitor = monitor
@@ -60,21 +63,110 @@ public struct MemoryPopoverView: View {
                 .padding(.top, 2)
             }
             
+            // Memory Trend Sparkline
+            VStack(alignment: .leading, spacing: 2) {
+                HStack {
+                    HStack(spacing: 4) {
+                        Image(systemName: "chart.xyaxis.line")
+                            .font(.system(size: 10))
+                            .foregroundStyle(MectricsTheme.coral)
+                        Text(loc("Memory Trend"))
+                            .font(.system(size: 11, weight: .regular))
+                            .foregroundStyle(MectricsTheme.textSecondary)
+                    }
+                    Spacer()
+                    Text(String(format: "%.1f%%", monitor.memory.usagePercentage))
+                        .font(.system(size: 11, weight: .bold, design: .monospaced))
+                        .foregroundStyle(MectricsTheme.coral)
+                }
+                SparklineView(
+                    values: monitor.memoryHistory.values,
+                    strokeColor: MectricsTheme.coral,
+                    lineWidth: 1.5,
+                    showFill: true,
+                    minScale: 0.0,
+                    maxScale: 100.0
+                )
+                .frame(height: 28)
+            }
+            
             // Key-Value Breakdown
             VStack(spacing: 2) {
-                PopoverKeyValueRow(label: loc("App Memory"), value: formatGB(monitor.memory.activeBytes))
-                PopoverKeyValueRow(label: loc("Wired Memory"), value: formatGB(monitor.memory.wiredBytes))
-                PopoverKeyValueRow(label: loc("Compressed"), value: formatGB(monitor.memory.compressedBytes))
-                PopoverKeyValueRow(label: loc("Cached Files"), value: formatGB(monitor.memory.cachedBytes))
-                PopoverKeyValueRow(label: loc("Total RAM"), value: formatGB(monitor.memory.totalBytes))
-                PopoverKeyValueRow(label: loc("Swap Used"), value: formatGB(monitor.memory.swapUsedBytes), isHighlighted: monitor.memory.swapUsedBytes > 500 * 1024 * 1024)
+                PopoverKeyValueRow(label: loc("App Memory"), value: formatGB(monitor.memory.activeBytes), icon: "app.fill")
+                PopoverKeyValueRow(label: loc("Wired Memory"), value: formatGB(monitor.memory.wiredBytes), icon: "lock.fill")
+                PopoverKeyValueRow(label: loc("Compressed"), value: formatGB(monitor.memory.compressedBytes), icon: "arrow.down.right.and.arrow.up.left")
+                PopoverKeyValueRow(label: loc("Cached Files"), value: formatGB(monitor.memory.cachedBytes), icon: "doc.on.doc.fill")
+                PopoverKeyValueRow(label: loc("Total RAM"), value: formatGB(monitor.memory.totalBytes), icon: "memorychip")
+                PopoverKeyValueRow(label: loc("Swap Used"), value: formatGB(monitor.memory.swapUsedBytes), icon: "arrow.left.arrow.right", isHighlighted: monitor.memory.swapUsedBytes > 500 * 1024 * 1024)
             }
             .padding(.vertical, 2)
             
-            // Action Button
-            PopoverActionButton(icon: "memorychip", title: loc("Open Activity Monitor (Memory)")) {
-                if let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.apple.ActivityMonitor") {
-                    NSWorkspace.shared.openApplication(at: url, configuration: NSWorkspace.OpenConfiguration())
+            // Collapsible Top Memory Processes
+            VStack(alignment: .leading, spacing: 6) {
+                Button {
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        showTopProcesses.toggle()
+                    }
+                } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: showTopProcesses ? "chevron.down" : "chevron.right")
+                            .font(.system(size: 9, weight: .bold))
+                        Text(loc("Top memory consumers"))
+                            .font(.system(size: 12, weight: .medium))
+                    }
+                    .foregroundStyle(MectricsTheme.coral)
+                }
+                .buttonStyle(.plain)
+                
+                if showTopProcesses {
+                    let topList = ProcessMonitor.shared.topMemoryProcesses()
+                    VStack(spacing: 3) {
+                        ForEach(topList) { proc in
+                            TopProcessRowView(
+                                pid: proc.id,
+                                name: proc.name,
+                                percentText: String(format: "%.1f%%", proc.memoryPercentage),
+                                isHighLoad: proc.memoryPercentage > 10.0,
+                                isMediumLoad: proc.memoryPercentage > 4.0,
+                                icon: "memorychip"
+                            )
+                        }
+                    }
+                    .padding(6)
+                    .background(Color.white.opacity(0.04))
+                    .clipShape(RoundedRectangle(cornerRadius: 6))
+                }
+            }
+            
+            // Action Buttons
+            VStack(spacing: 8) {
+                PopoverActionButton(
+                    icon: isPurging ? "arrow.triangle.2.circlepath" : "sparkles",
+                    title: isPurging ? loc("Purging...") : (purgedSuccess ? loc("Purged!") : loc("Purge Memory Cache"))
+                ) {
+                    guard !isPurging else { return }
+                    isPurging = true
+                    DispatchQueue.global(qos: .userInitiated).async {
+                        let process = Process()
+                        process.executableURL = URL(fileURLWithPath: "/usr/bin/purge")
+                        try? process.run()
+                        process.waitUntilExit()
+                        
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                            SystemMonitor.shared.refreshAll()
+                            isPurging = false
+                            purgedSuccess = true
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+                                purgedSuccess = false
+                            }
+                        }
+                    }
+                }
+                
+                PopoverActionButton(icon: "memorychip", title: loc("Open Activity Monitor (Memory)")) {
+                    if let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.apple.ActivityMonitor") {
+                        NSWorkspace.shared.openApplication(at: url, configuration: NSWorkspace.OpenConfiguration())
+                    }
                 }
             }
             

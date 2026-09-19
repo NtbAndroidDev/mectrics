@@ -44,6 +44,13 @@ if [ "$1" == "--install" ] || [ "$1" == "-i" ]; then
     pkill -f "Mectrics.app" || true
     rm -rf "/Applications/Mectrics.app"
     cp -R "$APP_NAME" "/Applications/"
+    
+    # Try creating CLI symlink
+    if [ -d "/usr/local/bin" ] && [ -w "/usr/local/bin" ]; then
+        ln -sf "/Applications/Mectrics.app/Contents/MacOS/Mectrics" "/usr/local/bin/mectrics" 2>/dev/null || true
+        echo "🔗 CLI symlink created at /usr/local/bin/mectrics"
+    fi
+    
     echo "🎉 Installed! Launching Mectrics..."
     open "/Applications/Mectrics.app"
 fi

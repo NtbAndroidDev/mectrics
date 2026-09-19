@@ -54,7 +54,10 @@ public struct SettingsView: View {
     @AppStorage("rule_temp_enabled") private var tempRuleEnabled = false
     @AppStorage("rule_temp_thresh") private var tempRuleThresh = 85
     
+    @AppStorage("rule_play_sound") private var playAlertSound = true
+    
     @State private var testNotificationSent = false
+    @State private var cliInstallStatus: String? = nil
     
     public init(monitor: SystemMonitor, initialTab: SettingsTab = .menuBar) {
         self.monitor = monitor
@@ -82,17 +85,17 @@ public struct SettingsView: View {
                             VStack(spacing: 3) {
                                 Image(systemName: tab.icon)
                                     .font(.system(size: 16, weight: .regular))
-                                    .foregroundStyle(isActive ? Color.blue : MectricsTheme.textSecondary)
+                                    .foregroundStyle(isActive ? MectricsTheme.coral : MectricsTheme.textSecondary)
                                 Text(loc(tab.rawValue))
                                     .font(.system(size: 10, weight: .regular))
                                     .foregroundStyle(isActive ? .white : MectricsTheme.textSecondary)
                             }
                             .frame(width: 72, height: 44)
-                            .background(isActive ? Color(red: 0.18, green: 0.28, blue: 0.42) : Color.clear)
+                            .background(isActive ? MectricsTheme.coral.opacity(0.16) : Color.clear)
                             .clipShape(RoundedRectangle(cornerRadius: 6))
                             .overlay(
                                 RoundedRectangle(cornerRadius: 6)
-                                    .stroke(isActive ? Color.blue.opacity(0.4) : Color.clear, lineWidth: 1)
+                                    .stroke(isActive ? MectricsTheme.coral.opacity(0.4) : Color.clear, lineWidth: 1)
                             )
                         }
                         .buttonStyle(.plain)
@@ -140,11 +143,11 @@ public struct SettingsView: View {
             // Live Status Bar Preview Box
             VStack(alignment: .leading, spacing: 8) {
                 HStack {
-                    Text("Live Status Bar Preview")
+                    Text(loc("Live Status Bar Preview"))
                         .font(.system(size: 11, weight: .semibold))
                         .foregroundStyle(MectricsTheme.textSecondary)
                     Spacer()
-                    Text("macOS Menu Bar")
+                    Text(loc("macOS Menu Bar"))
                         .font(.system(size: 10))
                         .foregroundStyle(MectricsTheme.textTertiary)
                 }
@@ -155,7 +158,7 @@ public struct SettingsView: View {
                             Image(systemName: "checkmark.shield")
                                 .font(.system(size: 11, weight: .semibold))
                                 .foregroundStyle(MectricsTheme.coral)
-                            Text("Healthy")
+                            Text(loc("All systems normal"))
                                 .font(.system(size: 11, weight: .medium))
                                 .foregroundStyle(.white)
                         }
@@ -237,7 +240,17 @@ public struct SettingsView: View {
                                 Image(systemName: "thermometer.medium")
                                     .font(.system(size: 11, weight: .semibold))
                                     .foregroundStyle(MectricsTheme.coral)
-                                Text("\(Int(monitor.sensor.cpuTemperature))°C")
+                                Text(monitor.formatTemperature(monitor.sensor.cpuTemperature))
+                                    .font(.system(size: 11, weight: .semibold, design: .monospaced))
+                            }
+                        }
+                        if monitor.showFansInMenuBar && !monitor.sensor.fans.isEmpty {
+                            let fastest = monitor.sensor.fans.map(\.currentRPM).max() ?? 0
+                            HStack(spacing: 3) {
+                                Image(systemName: "fan.fill")
+                                    .font(.system(size: 11, weight: .semibold))
+                                    .foregroundStyle(MectricsTheme.coral)
+                                Text("\(fastest)R")
                                     .font(.system(size: 11, weight: .semibold, design: .monospaced))
                             }
                         }
@@ -270,7 +283,7 @@ public struct SettingsView: View {
                     .foregroundStyle(.white)
                 
                 Toggle(loc("Compact Health Mode (Single Shield Slot)"), isOn: $monitor.useCompactHealthBar)
-                    .toggleStyle(SwitchToggleStyle(tint: .blue))
+                    .toggleStyle(SwitchToggleStyle(tint: MectricsTheme.coral))
                 
                 Text(loc("Compact Health Note"))
                     .font(.system(size: 11))
@@ -401,6 +414,23 @@ public struct SettingsView: View {
                                 .font(.system(size: 11))
                                 .foregroundStyle(MectricsTheme.textTertiary)
                         }
+                        
+                        if !monitor.sensor.fans.isEmpty {
+                            Divider().overlay(Color.white.opacity(0.06))
+                            
+                            // 8. Fans
+                            itemConfigRow(
+                                icon: "fan.fill",
+                                title: loc("Cooling Fans"),
+                                isOn: $monitor.showFansInMenuBar
+                            ) {
+                                Text(locManager.currentLanguage == .vietnamese
+                                     ? "Hiển thị tốc độ vòng quay quạt RPM trực tiếp trên thanh menu."
+                                     : "Displays live cooling fan RPM directly on the menu bar.")
+                                    .font(.system(size: 11))
+                                    .foregroundStyle(MectricsTheme.textTertiary)
+                            }
+                        }
                     }
                 }
                 .padding(14)
@@ -431,7 +461,7 @@ public struct SettingsView: View {
                 
                 Toggle("", isOn: isOn)
                     .labelsHidden()
-                    .toggleStyle(SwitchToggleStyle(tint: .blue))
+                    .toggleStyle(SwitchToggleStyle(tint: MectricsTheme.coral))
             }
             
             if isOn.wrappedValue {
@@ -453,6 +483,7 @@ public struct SettingsView: View {
         monitor.networkDisplayMode = .stacked
         monitor.showBatteryInMenuBar = true
         monitor.showSensorInMenuBar = true
+        monitor.showFansInMenuBar = false
         monitor.showGPUInMenuBar = false
     }
     
@@ -568,11 +599,14 @@ public struct SettingsView: View {
             Divider()
                 .overlay(Color.white.opacity(0.08))
             
-            // Notifications Section
-            VStack(alignment: .leading, spacing: 10) {
-                Text(loc("Notifications"))
+            // Audio & Notifications Section
+            VStack(alignment: .leading, spacing: 12) {
+                Text(loc("Alert Behavior & Delivery"))
                     .font(.system(size: 13, weight: .bold))
                     .foregroundStyle(.white)
+                
+                Toggle(loc("Play audible alert sound when condition triggers"), isOn: $playAlertSound)
+                    .toggleStyle(SwitchToggleStyle(tint: MectricsTheme.coral))
                 
                 HStack(spacing: 12) {
                     Button(loc("Open Notification Settings")) {
@@ -598,6 +632,49 @@ public struct SettingsView: View {
                     .font(.system(size: 11))
                     .foregroundStyle(MectricsTheme.textTertiary)
             }
+            .padding(14)
+            .background(Color.white.opacity(0.04))
+            .clipShape(RoundedRectangle(cornerRadius: 8))
+            
+            Divider()
+                .overlay(Color.white.opacity(0.08))
+            
+            // Headless CLI Automation (Matches Mectrics Spec)
+            VStack(alignment: .leading, spacing: 10) {
+                HStack {
+                    Image(systemName: "terminal")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(MectricsTheme.coral)
+                    Text(loc("Headless Automation CLI"))
+                        .font(.system(size: 13, weight: .bold))
+                        .foregroundStyle(.white)
+                    Spacer()
+                }
+                
+                Text(locManager.currentLanguage == .vietnamese
+                     ? "Cung cấp lệnh 'mectrics' trong Terminal để kiểm tra ngưỡng hệ thống (check, snapshot, doctor, watch) cho scripts và cron jobs."
+                     : "Provides the read-only 'mectrics' command in every Terminal for script health checks, snapshots, and alerts watch.")
+                    .font(.system(size: 11))
+                    .foregroundStyle(MectricsTheme.textSecondary)
+                
+                HStack(spacing: 12) {
+                    Button(loc("Install CLI (/usr/local/bin/mectrics)")) {
+                        let res = AppState.shared.installCLI()
+                        cliInstallStatus = res.message
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(MectricsTheme.coral)
+                    
+                    if let status = cliInstallStatus {
+                        Text(status)
+                            .font(.system(size: 11))
+                            .foregroundStyle(status.contains("installed") || status.contains("created") ? Color.green : Color.orange)
+                    }
+                }
+            }
+            .padding(14)
+            .background(Color.white.opacity(0.03))
+            .clipShape(RoundedRectangle(cornerRadius: 8))
         }
     }
     
@@ -643,7 +720,7 @@ public struct SettingsView: View {
                 // Toggle Switch
                 Toggle("", isOn: isOn)
                     .labelsHidden()
-                    .toggleStyle(SwitchToggleStyle(tint: .blue))
+                    .toggleStyle(SwitchToggleStyle(tint: MectricsTheme.coral))
                     .onChange(of: isOn.wrappedValue) {
                         syncRulesToEngine()
                     }
@@ -759,6 +836,25 @@ public struct SettingsView: View {
                     .pickerStyle(.segmented)
                     .frame(width: 180)
                 }
+                Divider()
+                    .overlay(Color.white.opacity(0.06))
+                
+                // Temperature Unit Selection
+                HStack {
+                    Text(loc("Temperature Unit"))
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(MectricsTheme.textSecondary)
+                    
+                    Spacer()
+                    
+                    Picker("", selection: $monitor.temperatureUnit) {
+                        ForEach(TemperatureUnit.allCases, id: \.self) { unit in
+                            Text(unit.rawValue).tag(unit)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+                    .frame(width: 200)
+                }
             }
             .padding()
             .background(Color.white.opacity(0.04))
@@ -771,9 +867,35 @@ public struct SettingsView: View {
                     .foregroundStyle(.white)
                 
                 Toggle(loc("Launch Mectrics automatically at login"), isOn: $launchAtLogin)
+                    .toggleStyle(SwitchToggleStyle(tint: MectricsTheme.coral))
                     .onChange(of: launchAtLogin) { _, newValue in
                         LaunchAtLoginManager.isEnabled = newValue
                     }
+            }
+            .padding()
+            .background(Color.white.opacity(0.04))
+            .clipShape(RoundedRectangle(cornerRadius: 8))
+            
+            // System Diagnostics (Matches Mectrics Spec)
+            VStack(alignment: .leading, spacing: 12) {
+                HStack {
+                    Text(loc("System Diagnostics"))
+                        .font(.system(size: 13, weight: .bold))
+                        .foregroundStyle(.white)
+                    Spacer()
+                }
+                
+                Text(locManager.currentLanguage == .vietnamese
+                     ? "Xem toàn bộ báo cáo phần cứng, tình trạng pin, quạt, bộ nhớ và sao chép báo cáo chi tiết."
+                     : "View comprehensive local system overview, battery health, thermal zones, and export plain text report.")
+                    .font(.system(size: 11))
+                    .foregroundStyle(MectricsTheme.textSecondary)
+                
+                Button(loc("Open System Diagnostics…")) {
+                    AppState.shared.openDiagnostics()
+                }
+                .buttonStyle(.bordered)
+                .tint(.white)
             }
             .padding()
             .background(Color.white.opacity(0.04))
@@ -817,6 +939,37 @@ public struct SettingsView: View {
             .padding()
             .background(Color.white.opacity(0.03))
             .clipShape(RoundedRectangle(cornerRadius: 8))
+            
+            // Clean Uninstall (Matches Mectrics Spec)
+            VStack(alignment: .leading, spacing: 10) {
+                Text(loc("Uninstall Mectrics"))
+                    .font(.system(size: 13, weight: .bold))
+                    .foregroundStyle(.white)
+                
+                Text(locManager.currentLanguage == .vietnamese
+                     ? "Gỡ bỏ hoàn toàn Mectrics, xoá sạch cấu hình đã lưu, huỷ mục khởi động cùng máy và xoá liên kết /usr/local/bin/mectrics."
+                     : "Clean removal: unregisters login items, clears settings domain, removes /usr/local/bin/mectrics and quits.")
+                    .font(.system(size: 11))
+                    .foregroundStyle(MectricsTheme.textSecondary)
+                
+                Button(role: .destructive) {
+                    AppState.shared.cleanUninstall()
+                } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: "trash")
+                        Text(loc("Uninstall Mectrics…"))
+                    }
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(.red.opacity(0.85))
+            }
+            .padding()
+            .background(Color.red.opacity(0.08))
+            .clipShape(RoundedRectangle(cornerRadius: 8))
+            .overlay(
+                RoundedRectangle(cornerRadius: 8)
+                    .stroke(Color.red.opacity(0.2), lineWidth: 1)
+            )
             
             // About
             VStack(alignment: .leading, spacing: 6) {

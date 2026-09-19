@@ -1,4 +1,5 @@
 import Foundation
+import AppKit
 import UserNotifications
 
 @MainActor
@@ -226,6 +227,10 @@ public final class RulesEngine: ObservableObject {
     }
     
     private func dispatchNotification(rule: AlertRule, currentValue: String) {
+        if UserDefaults.standard.bool(forKey: "rule_play_sound") {
+            NSSound.beep()
+        }
+        
         let content = UNMutableNotificationContent()
         content.title = "Mectrics Alert: \(rule.name)"
         content.body = "Condition sustained for \(rule.sustainedSeconds)s. Current value: \(currentValue)"

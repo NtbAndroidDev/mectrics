@@ -2,7 +2,7 @@ import Foundation
 import Metal
 import IOKit
 
-public final class GPUMonitor: @unchecked Sendable {
+public final class GPUMonitor: GPUMonitoring, @unchecked Sendable {
     private var gpuDevice: MTLDevice?
     
     public init() {

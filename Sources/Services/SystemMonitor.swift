@@ -11,6 +11,11 @@ public enum NetworkDisplayMode: String, Codable, CaseIterable {
     case totalRate = "Single Total (e.g. 10.3 KB/s)"
 }
 
+public enum TemperatureUnit: String, Codable, CaseIterable {
+    case celsius = "Celsius (°C)"
+    case fahrenheit = "Fahrenheit (°F)"
+}
+
 @MainActor
 public final class SystemMonitor: ObservableObject {
     public static let shared = SystemMonitor()
@@ -87,19 +92,61 @@ public final class SystemMonitor: ObservableObject {
     @Published public var showSensorInMenuBar: Bool {
         didSet { UserDefaults.standard.set(showSensorInMenuBar, forKey: "pref_showSensor") }
     }
+    @Published public var showFansInMenuBar: Bool {
+        didSet { UserDefaults.standard.set(showFansInMenuBar, forKey: "pref_showFans") }
+    }
+    @Published public var temperatureUnit: TemperatureUnit {
+        didSet { UserDefaults.standard.set(temperatureUnit.rawValue, forKey: "pref_temperatureUnit") }
+    }
     
-    // Background Samplers
-    private let cpuMonitor = CPUMonitor()
-    private let memoryMonitor = MemoryMonitor()
-    private let batteryMonitor = BatteryMonitor()
-    private let networkMonitor = NetworkMonitor()
-    private let diskMonitor = DiskMonitor()
-    private let gpuMonitor = GPUMonitor()
-    private let sensorMonitor = SensorMonitor()
+    public func formatTemperature(_ celsius: Double) -> String {
+        if temperatureUnit == .fahrenheit {
+            let f = (celsius * 9.0 / 5.0) + 32.0
+            return String(format: "%.0f°F", f)
+        } else {
+            return String(format: "%.0f°C", celsius)
+        }
+    }
+    
+    public func formatTemperaturePrecise(_ celsius: Double) -> String {
+        if temperatureUnit == .fahrenheit {
+            let f = (celsius * 9.0 / 5.0) + 32.0
+            return String(format: "%.1f°F", f)
+        } else {
+            return String(format: "%.1f°C", celsius)
+        }
+    }
+    
+    // Background Samplers (Injected Clean Architecture Protocols)
+    private let cpuMonitor: CPUMonitoring
+    private let memoryMonitor: MemoryMonitoring
+    private let batteryMonitor: BatteryMonitoring
+    private let networkMonitor: NetworkMonitoring
+    private let diskMonitor: DiskMonitoring
+    private let gpuMonitor: GPUMonitoring
+    private let sensorMonitor: SensorMonitoring
     
     private var timer: Timer?
+    private var sampleCycleCount: UInt64 = 0
+    private var isPaused: Bool = false
     
-    private init() {
+    public init(
+        cpuMonitor: CPUMonitoring = CPUMonitor(),
+        memoryMonitor: MemoryMonitoring = MemoryMonitor(),
+        batteryMonitor: BatteryMonitoring = BatteryMonitor(),
+        networkMonitor: NetworkMonitoring = NetworkMonitor(),
+        diskMonitor: DiskMonitoring = DiskMonitor(),
+        gpuMonitor: GPUMonitoring = GPUMonitor(),
+        sensorMonitor: SensorMonitoring = SensorMonitor()
+    ) {
+        self.cpuMonitor = cpuMonitor
+        self.memoryMonitor = memoryMonitor
+        self.batteryMonitor = batteryMonitor
+        self.networkMonitor = networkMonitor
+        self.diskMonitor = diskMonitor
+        self.gpuMonitor = gpuMonitor
+        self.sensorMonitor = sensorMonitor
+        
         // Register defaults
         let defaults = UserDefaults.standard
         defaults.register(defaults: [
@@ -115,11 +162,14 @@ public final class SystemMonitor: ObservableObject {
             "pref_networkDisplayMode": NetworkDisplayMode.stacked.rawValue,
             "pref_showBattery": true,
             "pref_showGPU": false,
-            "pref_showSensor": true
+            "pref_showSensor": true,
+            "pref_showFans": false,
+            "pref_temperatureUnit": TemperatureUnit.celsius.rawValue
         ])
         
         // Load persisted settings
-        self.updateInterval = defaults.double(forKey: "pref_updateInterval")
+        let savedInterval = defaults.double(forKey: "pref_updateInterval")
+        self.updateInterval = savedInterval >= 0.5 ? savedInterval : 1.0
         self.useCompactHealthBar = defaults.bool(forKey: "pref_useCompactHealthBar")
         self.showCPUInMenuBar = defaults.bool(forKey: "pref_showCPU")
         self.showCPUSparkline = defaults.bool(forKey: "pref_showCPUSparkline")
@@ -132,15 +182,31 @@ public final class SystemMonitor: ObservableObject {
         self.showBatteryInMenuBar = defaults.bool(forKey: "pref_showBattery")
         self.showGPUInMenuBar = defaults.bool(forKey: "pref_showGPU")
         self.showSensorInMenuBar = defaults.bool(forKey: "pref_showSensor")
+        self.showFansInMenuBar = defaults.bool(forKey: "pref_showFans")
+        self.temperatureUnit = TemperatureUnit(rawValue: defaults.string(forKey: "pref_temperatureUnit") ?? "") ?? .celsius
         
         // Initial sample
         refreshAll()
         startTimer()
     }
     
+    public func pauseMonitoring() {
+        isPaused = true
+        timer?.invalidate()
+        timer = nil
+    }
+    
+    public func resumeMonitoring() {
+        guard isPaused else { return }
+        isPaused = false
+        refreshAll()
+        startTimer()
+    }
+    
     public func startTimer() {
         timer?.invalidate()
-        let interval = max(0.2, updateInterval)
+        guard !isPaused else { return }
+        let interval = max(0.5, updateInterval > 0 ? updateInterval : 1.0)
         timer = Timer.scheduledTimer(withTimeInterval: interval, repeats: true) { [weak self] _ in
             Task { @MainActor [weak self] in
                 self?.refreshAll()
@@ -153,52 +219,103 @@ public final class SystemMonitor: ObservableObject {
         startTimer()
     }
     
+    private var isRefreshing = false
+    
     public func refreshAll() {
-        let newCPU = cpuMonitor.sample()
-        let newMem = memoryMonitor.sample()
-        let newBat = batteryMonitor.sample()
-        let newNet = networkMonitor.sample()
-        let newDisk = diskMonitor.sample()
-        let newGPU = gpuMonitor.sample()
-        let newSensors = sensorMonitor.sample()
+        guard !isRefreshing, !isPaused else { return }
+        isRefreshing = true
+        sampleCycleCount &+= 1
+        let cycle = sampleCycleCount
         
-        self.cpu = newCPU
-        self.memory = newMem
-        self.battery = newBat
-        self.network = newNet
-        self.disk = newDisk
-        self.gpu = newGPU
-        self.sensor = newSensors
+        let cpuMon = self.cpuMonitor
+        let memMon = self.memoryMonitor
+        let batMon = self.batteryMonitor
+        let netMon = self.networkMonitor
+        let diskMon = self.diskMonitor
+        let gpuMon = self.gpuMonitor
+        let sensorMon = self.sensorMonitor
         
+        // Smart adaptive sampling: reduce frequency of heavy IOKit queries if inactive in Menu Bar
+        let shouldSampleGPU = showGPUInMenuBar || (cycle % 4 == 0)
+        let shouldSampleSensors = showSensorInMenuBar || (cycle % 3 == 0)
+        let shouldSampleBattery = (showBatteryInMenuBar && battery.isPresent) || (cycle % 5 == 0)
+        
+        let lastBattery = self.battery
+        let lastGPU = self.gpu
+        let lastSensors = self.sensor
+        
+        Task.detached(priority: .utility) { [weak self] in
+            let newCPU = cpuMon.sample()
+            let newMem = memMon.sample()
+            let newNet = netMon.sample()
+            let newDisk = diskMon.sample()
+            let newBat = shouldSampleBattery ? batMon.sample() : lastBattery
+            let newGPU = shouldSampleGPU ? gpuMon.sample() : lastGPU
+            let newSensors = shouldSampleSensors ? sensorMon.sample() : lastSensors
+            
+            await MainActor.run { [weak self] in
+                guard let self = self else { return }
+                self.applyMetrics(
+                    cpu: newCPU,
+                    mem: newMem,
+                    bat: newBat,
+                    net: newNet,
+                    disk: newDisk,
+                    gpu: newGPU,
+                    sensors: newSensors
+                )
+                self.isRefreshing = false
+            }
+        }
+    }
+    
+    private func applyMetrics(
+        cpu: CPUMetrics,
+        mem: MemoryMetrics,
+        bat: BatteryMetrics,
+        net: NetworkMetrics,
+        disk: DiskMetrics,
+        gpu: GPUMetrics,
+        sensors: SensorMetrics
+    ) {
         // Append history for sparklines
-        cpuHistory.append(newCPU.totalUsage)
-        memoryHistory.append(newMem.usagePercentage)
-        networkDownHistory.append(newNet.downloadBytesPerSec)
-        networkUpHistory.append(newNet.uploadBytesPerSec)
-        diskReadHistory.append(newDisk.readBytesPerSec)
-        diskWriteHistory.append(newDisk.writeBytesPerSec)
-        gpuHistory.append(newGPU.usagePercentage)
-        tempHistory.append(newSensors.cpuTemperature)
+        cpuHistory.append(cpu.totalUsage)
+        memoryHistory.append(mem.usagePercentage)
+        networkDownHistory.append(net.downloadBytesPerSec)
+        networkUpHistory.append(net.uploadBytesPerSec)
+        diskReadHistory.append(disk.readBytesPerSec)
+        diskWriteHistory.append(disk.writeBytesPerSec)
+        gpuHistory.append(gpu.usagePercentage)
+        tempHistory.append(sensors.cpuTemperature)
         
         // Calculate Compact Health Score
-        self.health = computeHealthScore(
-            cpu: newCPU,
-            memory: newMem,
-            battery: newBat,
-            sensors: newSensors,
-            disk: newDisk
+        let newHealth = computeHealthScore(
+            cpu: cpu,
+            memory: mem,
+            battery: bat,
+            sensors: sensors,
+            disk: disk
         )
         
         // Evaluate Rules
         rulesEngine.evaluate(
-            cpu: newCPU,
-            memory: newMem,
-            battery: newBat,
-            disk: newDisk,
-            sensor: newSensors,
-            gpu: newGPU,
-            sampleInterval: updateInterval
+            cpu: cpu,
+            memory: mem,
+            battery: bat,
+            disk: disk,
+            sensor: sensors,
+            gpu: gpu,
+            sampleInterval: max(0.5, updateInterval)
         )
+        
+        self.cpu = cpu
+        self.memory = mem
+        self.battery = bat
+        self.network = net
+        self.disk = disk
+        self.gpu = gpu
+        self.sensor = sensors
+        self.health = newHealth
     }
     
     private func computeHealthScore(

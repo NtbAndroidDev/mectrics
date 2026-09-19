@@ -5,6 +5,12 @@ import AppKit
 struct MectricsApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
     
+    init() {
+        if HeadlessCLIRunner.handleCommandLineIfNeeded() {
+            exit(0)
+        }
+    }
+    
     var body: some Scene {
         Settings {
             EmptyView()

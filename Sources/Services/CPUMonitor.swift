@@ -1,7 +1,7 @@
 import Foundation
 import Darwin
 
-public final class CPUMonitor: @unchecked Sendable {
+public final class CPUMonitor: CPUMonitoring, @unchecked Sendable {
     private var previousPerCoreTicks: [[UInt32]] = []
     private var previousCpuLoad: host_cpu_load_info = host_cpu_load_info()
     private var hasPreviousLoad = false
@@ -18,12 +18,25 @@ public final class CPUMonitor: @unchecked Sendable {
         metrics.logicalCores = ProcessInfo.processInfo.processorCount
         metrics.modelName = getCPUBrandString()
         
+        let p = getSysctlInt("hw.perflevel0.logicalcpu")
+        let e = getSysctlInt("hw.perflevel1.logicalcpu")
+        if p > 0 || e > 0 {
+            metrics.pCores = p
+            metrics.eCores = e
+        } else {
+            metrics.pCores = metrics.logicalCores
+            metrics.eCores = 0
+        }
+        
         // 1. Overall CPU Load via host_statistics
+        let hostPort = mach_host_self()
+        defer { mach_port_deallocate(mach_task_self_, hostPort) }
+        
         var count = mach_msg_type_number_t(MemoryLayout<host_cpu_load_info_data_t>.size / MemoryLayout<integer_t>.size)
         var cpuLoad = host_cpu_load_info()
         let result = withUnsafeMutablePointer(to: &cpuLoad) {
             $0.withMemoryRebound(to: integer_t.self, capacity: Int(count)) {
-                host_statistics(mach_host_self(), HOST_CPU_LOAD_INFO, $0, &count)
+                host_statistics(hostPort, HOST_CPU_LOAD_INFO, $0, &count)
             }
         }
         
@@ -52,7 +65,7 @@ public final class CPUMonitor: @unchecked Sendable {
         var numProcessorInfo: mach_msg_type_number_t = 0
         
         let procResult = host_processor_info(
-            mach_host_self(),
+            hostPort,
             PROCESSOR_CPU_LOAD_INFO,
             &numProcessors,
             &processorInfo,
@@ -116,6 +129,17 @@ public final class CPUMonitor: @unchecked Sendable {
         
         var buffer = [CChar](repeating: 0, count: size)
         sysctlbyname("machdep.cpu.brand_string", &buffer, &size, nil, 0)
-        return String(cString: buffer)
+        return buffer.withUnsafeBufferPointer { ptr in
+            ptr.baseAddress.map { String(cString: $0) } ?? "Apple Silicon"
+        }
+    }
+    
+    private func getSysctlInt(_ name: String) -> Int {
+        var value: Int32 = 0
+        var size = MemoryLayout<Int32>.size
+        if sysctlbyname(name, &value, &size, nil, 0) == 0 {
+            return Int(value)
+        }
+        return 0
     }
 }

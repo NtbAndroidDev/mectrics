@@ -1,12 +1,25 @@
 import Foundation
 import Darwin
+import CoreWLAN
 
-public final class NetworkMonitor: @unchecked Sendable {
+public final class NetworkMonitor: NetworkMonitoring, @unchecked Sendable {
     private var previousInBytes: UInt64 = 0
     private var previousOutBytes: UInt64 = 0
     private var previousTimestamp: Date = Date()
     private var isFirstSample = true
     private let lock = NSLock()
+    
+    // Background caches
+    private var lastPingCheck = Date.distantPast
+    private var cachedPingMs: Double? = nil
+    private var isPinging = false
+    
+    private var lastPublicIPCheck = Date.distantPast
+    private var cachedPublicIP: String? = nil
+    private var isFetchingPublicIP = false
+    
+    private var lastGatewayCheck = Date.distantPast
+    private var cachedGatewayIP: String? = nil
     
     public init() {}
     
@@ -44,7 +57,9 @@ public final class NetworkMonitor: @unchecked Sendable {
                     if getnameinfo(interface.ifa_addr, socklen_t(interface.ifa_addr.pointee.sa_len),
                                    &hostname, socklen_t(hostname.count),
                                    nil, 0, NI_NUMERICHOST) == 0 {
-                        ipAddress = String(cString: hostname)
+                        ipAddress = hostname.withUnsafeBufferPointer { ptr in
+                            ptr.baseAddress.map { String(cString: $0) } ?? "127.0.0.1"
+                        }
                         primaryName = name
                     }
                 }
@@ -86,6 +101,137 @@ public final class NetworkMonitor: @unchecked Sendable {
         previousOutBytes = currentOutBytes
         previousTimestamp = now
         
+        // 1. Wi-Fi details via CoreWLAN
+        enrichWiFi(&metrics)
+        
+        // 2. Gateway IP
+        if Date().timeIntervalSince(lastGatewayCheck) >= 30.0 || cachedGatewayIP == nil {
+            cachedGatewayIP = fetchGatewayIP()
+            lastGatewayCheck = Date()
+        }
+        metrics.gatewayIpAddress = cachedGatewayIP
+        
+        // 3. Ping Latency in background
+        measurePingInBackground()
+        metrics.pingLatencyMs = cachedPingMs
+        
+        // 4. Public IP in background
+        fetchPublicIPInBackground()
+        metrics.publicIpAddress = cachedPublicIP
+        
         return metrics
+    }
+    
+    private func enrichWiFi(_ metrics: inout NetworkMetrics) {
+        if let iface = CWWiFiClient.shared().interface() {
+            let rssi = iface.rssiValue()
+            if rssi != 0 {
+                metrics.wifiRssi = rssi
+            }
+            let rate = iface.transmitRate()
+            if rate > 0 {
+                metrics.wifiTxRate = rate
+            }
+            if let ssid = iface.ssid(), !ssid.isEmpty {
+                metrics.wifiSsid = ssid
+            }
+        }
+    }
+    
+    private func fetchGatewayIP() -> String? {
+        let pipe = Pipe()
+        let proc = Process()
+        proc.executableURL = URL(fileURLWithPath: "/sbin/route")
+        proc.arguments = ["-n", "get", "default"]
+        proc.standardOutput = pipe
+        proc.standardError = FileHandle.nullDevice
+        do {
+            try proc.run()
+            proc.waitUntilExit()
+            let data = pipe.fileHandleForReading.readDataToEndOfFile()
+            if let out = String(data: data, encoding: .utf8) {
+                for line in out.components(separatedBy: .newlines) {
+                    let trimmed = line.trimmingCharacters(in: .whitespaces)
+                    if trimmed.hasPrefix("gateway:") {
+                        let parts = trimmed.components(separatedBy: ":")
+                        if parts.count >= 2 {
+                            return parts[1].trimmingCharacters(in: .whitespaces)
+                        }
+                    }
+                }
+            }
+        } catch {}
+        return nil
+    }
+    
+    private func fetchPublicIPInBackground() {
+        guard !isFetchingPublicIP && (Date().timeIntervalSince(lastPublicIPCheck) >= 300.0 || cachedPublicIP == nil) else { return }
+        isFetchingPublicIP = true
+        
+        DispatchQueue.global(qos: .utility).async { [weak self] in
+            guard let url = URL(string: "https://api.ipify.org") else {
+                self?.lock.lock()
+                self?.isFetchingPublicIP = false
+                self?.lock.unlock()
+                return
+            }
+            var request = URLRequest(url: url)
+            request.timeoutInterval = 3.0
+            
+            let task = URLSession.shared.dataTask(with: request) { data, _, _ in
+                self?.lock.lock()
+                defer {
+                    self?.isFetchingPublicIP = false
+                    self?.lastPublicIPCheck = Date()
+                    self?.lock.unlock()
+                }
+                if let data = data,
+                   let ip = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines),
+                   !ip.isEmpty {
+                    self?.cachedPublicIP = ip
+                }
+            }
+            task.resume()
+        }
+    }
+
+    private func measurePingInBackground() {
+        guard !isPinging && Date().timeIntervalSince(lastPingCheck) >= 5.0 else { return }
+        isPinging = true
+        DispatchQueue.global(qos: .utility).async { [weak self] in
+            let start = DispatchTime.now()
+            var hints = addrinfo()
+            hints.ai_family = AF_INET
+            hints.ai_socktype = SOCK_STREAM
+            var res: UnsafeMutablePointer<addrinfo>?
+            
+            if getaddrinfo("1.1.1.1", "53", &hints, &res) == 0, let addr = res {
+                defer { freeaddrinfo(res) }
+                let sock = socket(addr.pointee.ai_family, addr.pointee.ai_socktype, addr.pointee.ai_protocol)
+                if sock >= 0 {
+                    var tv = timeval(tv_sec: 0, tv_usec: 500_000)
+                    setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, &tv, socklen_t(MemoryLayout<timeval>.size))
+                    setsockopt(sock, SOL_SOCKET, SO_SNDTIMEO, &tv, socklen_t(MemoryLayout<timeval>.size))
+                    
+                    if connect(sock, addr.pointee.ai_addr, addr.pointee.ai_addrlen) == 0 {
+                        let end = DispatchTime.now()
+                        let nanos = end.uptimeNanoseconds - start.uptimeNanoseconds
+                        let ms = Double(nanos) / 1_000_000.0
+                        self?.lock.lock()
+                        self?.cachedPingMs = ms
+                        self?.lastPingCheck = Date()
+                        self?.isPinging = false
+                        self?.lock.unlock()
+                        close(sock)
+                        return
+                    }
+                    close(sock)
+                }
+            }
+            self?.lock.lock()
+            self?.lastPingCheck = Date()
+            self?.isPinging = false
+            self?.lock.unlock()
+        }
     }
 }

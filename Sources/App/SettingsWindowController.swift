@@ -8,8 +8,9 @@ public final class SettingsWindowController: NSObject, NSWindowDelegate {
     private var window: NSWindow?
     
     public func show(tab: SettingsTab = .menuBar) {
+        let localizedTitle = LocalizationManager.shared.t(tab.rawValue)
         if let existing = window {
-            existing.title = tab.rawValue
+            existing.title = localizedTitle
             existing.makeKeyAndOrderFront(nil)
             NSApp.activate(ignoringOtherApps: true)
             NotificationCenter.default.post(name: Notification.Name("didSelectSettingsTab"), object: tab)
@@ -20,8 +21,9 @@ public final class SettingsWindowController: NSObject, NSWindowDelegate {
         let hostingController = NSHostingController(rootView: settingsView)
         
         let newWindow = NSWindow(contentViewController: hostingController)
-        newWindow.title = tab.rawValue
+        newWindow.title = localizedTitle
         newWindow.styleMask = [.titled, .closable, .miniaturizable]
+        newWindow.titlebarAppearsTransparent = true
         newWindow.titleVisibility = .visible
         newWindow.isReleasedWhenClosed = false
         newWindow.delegate = self

@@ -1,8 +1,164 @@
 import Foundation
 import IOKit
 
-public final class SensorMonitor: @unchecked Sendable {
-    public init() {}
+// MARK: - SMC Client for Hardware Sensors & Fans
+public final class SMCClient: @unchecked Sendable {
+    private struct SMCVersion {
+        var major: UInt8 = 0, minor: UInt8 = 0, build: UInt8 = 0
+        var reserved: UInt8 = 0
+        var release: UInt16 = 0
+    }
+
+    private struct SMCPLimitData {
+        var version: UInt16 = 0, length: UInt16 = 0
+        var cpuPLimit: UInt32 = 0, gpuPLimit: UInt32 = 0, memPLimit: UInt32 = 0
+    }
+
+    public struct KeyInfo {
+        var dataSize: UInt32 = 0
+        var dataType: UInt32 = 0
+        var dataAttributes: UInt8 = 0
+    }
+
+    private struct SMCParamStruct {
+        var key: UInt32 = 0
+        var vers = SMCVersion()
+        var pLimitData = SMCPLimitData()
+        var keyInfo = KeyInfo()
+        var padding: UInt16 = 0
+        var result: UInt8 = 0
+        var status: UInt8 = 0
+        var data8: UInt8 = 0
+        var data32: UInt32 = 0
+        var bytes: (UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8,
+                    UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8,
+                    UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8,
+                    UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8) =
+            (0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+             0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
+    }
+
+    private enum Command: UInt8 {
+        case readKey = 5
+        case readIndex = 8
+        case readKeyInfo = 9
+    }
+
+    private static let kernelIndex: UInt32 = 2
+
+    private var connection: io_connect_t = 0
+    private var keyInfoCache: [String: KeyInfo] = [:]
+
+    public init?() {
+        let service = IOServiceGetMatchingService(kIOMainPortDefault, IOServiceMatching("AppleSMC"))
+        guard service != 0 else { return nil }
+        defer { IOObjectRelease(service) }
+        guard IOServiceOpen(service, mach_task_self_, 0, &connection) == KERN_SUCCESS, connection != 0 else {
+            return nil
+        }
+    }
+
+    deinit {
+        if connection != 0 {
+            IOServiceClose(connection)
+        }
+    }
+
+    private func call(_ input: inout SMCParamStruct) -> SMCParamStruct? {
+        var output = SMCParamStruct()
+        var outputSize = MemoryLayout<SMCParamStruct>.stride
+        let result = IOConnectCallStructMethod(
+            connection,
+            Self.kernelIndex,
+            &input,
+            MemoryLayout<SMCParamStruct>.stride,
+            &output,
+            &outputSize
+        )
+        guard result == KERN_SUCCESS, output.result == 0 else { return nil }
+        return output
+    }
+
+    public static func keyCode(_ name: String) -> UInt32 {
+        name.utf8.prefix(4).reduce(0) { ($0 << 8) | UInt32($1) }
+    }
+
+    public static func keyName(_ code: UInt32) -> String {
+        let scalars = [24, 16, 8, 0].map { Character(UnicodeScalar(UInt8((code >> $0) & 0xFF))) }
+        return String(scalars)
+    }
+
+    public func keyInfo(_ name: String) -> KeyInfo? {
+        if let cached = keyInfoCache[name] { return cached }
+        var input = SMCParamStruct()
+        input.key = Self.keyCode(name)
+        input.data8 = Command.readKeyInfo.rawValue
+        guard let output = call(&input) else { return nil }
+        keyInfoCache[name] = output.keyInfo
+        return output.keyInfo
+    }
+
+    public func readData(_ name: String) -> [UInt8]? {
+        guard let info = keyInfo(name) else { return nil }
+        guard info.dataSize > 0, info.dataSize <= 32 else { return nil }
+        var input = SMCParamStruct()
+        input.key = Self.keyCode(name)
+        input.keyInfo = info
+        input.data8 = Command.readKey.rawValue
+        guard let output = call(&input) else { return nil }
+        return withUnsafeBytes(of: output.bytes) { raw in
+            Array(raw.prefix(Int(info.dataSize)))
+        }
+    }
+
+    public func readValue(_ name: String) -> Double? {
+        guard let info = keyInfo(name), let data = readData(name) else { return nil }
+        let type = Self.keyName(info.dataType)
+        switch type {
+        case "flt " where data.count >= 4:
+            let bits = data.withUnsafeBytes { $0.load(as: UInt32.self) }
+            return Double(Float(bitPattern: bits))
+        case "sp78" where data.count >= 2:
+            let raw = Int16(bitPattern: UInt16(data[0]) << 8 | UInt16(data[1]))
+            return Double(raw) / 256.0
+        case "fpe2" where data.count >= 2:
+            return Double(UInt16(data[0]) << 8 | UInt16(data[1])) / 4.0
+        case "ui8 " where data.count >= 1:
+            return Double(data[0])
+        case "ui16" where data.count >= 2:
+            return Double(UInt16(data[0]) << 8 | UInt16(data[1]))
+        case "ui32" where data.count >= 4:
+            return Double(UInt32(data[0]) << 24 | UInt32(data[1]) << 16 | UInt32(data[2]) << 8 | UInt32(data[3]))
+        default:
+            return nil
+        }
+    }
+}
+
+// MARK: - Sensor & Fan Monitor
+public final class SensorMonitor: SensorMonitoring, @unchecked Sendable {
+    private let smc: SMCClient?
+    private var fanIndices: [Int] = []
+    
+    public init() {
+        self.smc = SMCClient()
+        self.fanIndices = detectFans()
+    }
+    
+    private func detectFans() -> [Int] {
+        guard let smc = smc else { return [] }
+        if let fnum = smc.readValue("FNum"), fnum > 0 && fnum <= 8 {
+            return Array(0..<Int(fnum))
+        }
+        // Fallback probing
+        var detected: [Int] = []
+        for i in 0..<4 {
+            if smc.readValue("F\(i)Ac") != nil {
+                detected.append(i)
+            }
+        }
+        return detected
+    }
     
     public func sample() -> SensorMetrics {
         var metrics = SensorMetrics()
@@ -22,8 +178,8 @@ public final class SensorMonitor: @unchecked Sendable {
             metrics.thermalPressure = .nominal
         }
         
-        // 2. Hardware Temperatures & Fan Speeds via AppleSMC / IOHID
-        let (cpuTemp, gpuTemp, fans) = readHardwareSensors()
+        // 2. Hardware Temperatures & Fan Speeds via AppleSMC
+        let (cpuTemp, gpuTemp, fans) = readHardwareSensors(thermalState: metrics.thermalPressure)
         metrics.cpuTemperature = cpuTemp
         metrics.gpuTemperature = gpuTemp
         metrics.fans = fans
@@ -31,45 +187,61 @@ public final class SensorMonitor: @unchecked Sendable {
         return metrics
     }
     
-    private func readHardwareSensors() -> (Double, Double, [FanInfo]) {
-        var cpuTemp: Double = 42.0
-        var gpuTemp: Double = 40.0
+    private func readHardwareSensors(thermalState: ThermalPressureState) -> (Double, Double, [FanInfo]) {
+        var cpuTemp: Double = 0.0
+        var gpuTemp: Double = 0.0
         var fans: [FanInfo] = []
         
-        // Check AppleSMC
-        let smcService = IOServiceGetMatchingService(kIOMainPortDefault, IOServiceMatching("AppleSMC"))
-        if smcService != 0 {
-            IOObjectRelease(smcService)
-        }
-        
-        // Query AppleARMIODevice or ThermalZone
-        var iterator: io_iterator_t = 0
-        let matching = IOServiceMatching("IOPlatformDevice")
-        if IOServiceGetMatchingServices(kIOMainPortDefault, matching, &iterator) == kIOReturnSuccess {
-            var service = IOIteratorNext(iterator)
-            while service != 0 {
-                IOObjectRelease(service)
-                service = IOIteratorNext(iterator)
+        if let smc = smc {
+            // Read CPU Cluster sensors (Tp... P-cores, Te... E-cores, TC0P Intel)
+            let cpuKeys = ["Tp09", "Tp0T", "Tp01", "Tp05", "Te05", "Te0t", "TC0P", "TC0E", "TC0F"]
+            for key in cpuKeys {
+                if let v = smc.readValue(key), (20...120).contains(v) {
+                    cpuTemp = max(cpuTemp, v)
+                }
             }
-            IOObjectRelease(iterator)
+            
+            // Read GPU sensors (Tg... GPU cluster, TG0P)
+            let gpuKeys = ["Tg05", "Tg0D", "Tg0P", "TG0P", "TG0D"]
+            for key in gpuKeys {
+                if let v = smc.readValue(key), (20...120).contains(v) {
+                    gpuTemp = max(gpuTemp, v)
+                }
+            }
+            
+            // Read Fans
+            for i in fanIndices {
+                let current = Int(smc.readValue("F\(i)Ac") ?? 0)
+                let minRPM = Int(smc.readValue("F\(i)Mn") ?? 1200)
+                let maxRPM = Int(smc.readValue("F\(i)Mx") ?? 5500)
+                let name = fanIndices.count > 1 ? (i == 0 ? "Left Fan" : "Right Fan") : "System Fan"
+                fans.append(FanInfo(id: i + 1, name: name, currentRPM: max(0, current), minRPM: minRPM, maxRPM: maxRPM))
+            }
         }
         
-        // Base thermal estimations based on macOS thermalState if direct SMC keys require kext
-        let baseTemp: Double
-        switch ProcessInfo.processInfo.thermalState {
-        case .nominal: baseTemp = 44.0
-        case .fair: baseTemp = 68.0
-        case .serious: baseTemp = 88.0
-        case .critical: baseTemp = 99.0
-        @unknown default: baseTemp = 45.0
+        // Smart fallback if SMC temperature keys are restricted or unavailable
+        if cpuTemp < 25.0 {
+            let base: Double
+            switch thermalState {
+            case .nominal: base = 42.0
+            case .fair: base = 68.0
+            case .serious: base = 88.0
+            case .critical: base = 98.0
+            }
+            cpuTemp = base
         }
         
-        cpuTemp = max(35.0, baseTemp)
-        gpuTemp = max(32.0, baseTemp - 3.0)
+        if gpuTemp < 25.0 {
+            gpuTemp = max(32.0, cpuTemp - 3.0)
+        }
         
-        // Fans: On Apple Silicon MacBook Pro / Mac Studio / Mac Pro
-        // Detect fan presence or fallback to fanless (MacBook Air)
-        fans.append(FanInfo(id: 1, name: "Main Fan", currentRPM: baseTemp > 65 ? 2400 : 1200, minRPM: 1200, maxRPM: 5500))
+        // If device has fans detected or is MacBook Pro with fan support
+        if fans.isEmpty && !fanIndices.isEmpty {
+            for i in fanIndices {
+                let name = fanIndices.count > 1 ? (i == 0 ? "Left Fan" : "Right Fan") : "System Fan"
+                fans.append(FanInfo(id: i + 1, name: name, currentRPM: cpuTemp > 65 ? 2400 : 1200, minRPM: 1200, maxRPM: 5500))
+            }
+        }
         
         return (cpuTemp, gpuTemp, fans)
     }

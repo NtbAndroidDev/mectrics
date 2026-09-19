@@ -2,8 +2,8 @@ import AppKit
 import SwiftUI
 
 @MainActor
-public final class AttentionLogWindowController: NSObject, NSWindowDelegate {
-    public static let shared = AttentionLogWindowController()
+public final class DiagnosticsWindowController: NSObject, NSWindowDelegate {
+    public static let shared = DiagnosticsWindowController()
     
     private var window: NSWindow?
     
@@ -14,12 +14,12 @@ public final class AttentionLogWindowController: NSObject, NSWindowDelegate {
             return
         }
         
-        let logView = AttentionLogView(rulesEngine: SystemMonitor.shared.rulesEngine)
-        let hosting = NSHostingController(rootView: logView)
+        let diagView = DiagnosticsView()
+        let hosting = NSHostingController(rootView: diagView)
         
         let newWindow = NSWindow(contentViewController: hosting)
-        newWindow.title = LocalizationManager.shared.t("Attention Log")
-        newWindow.styleMask = [.titled, .closable, .miniaturizable]
+        newWindow.title = LocalizationManager.shared.t("System Diagnostics")
+        newWindow.styleMask = [.titled, .closable, .miniaturizable, .resizable]
         newWindow.titleVisibility = .visible
         newWindow.isReleasedWhenClosed = false
         newWindow.delegate = self

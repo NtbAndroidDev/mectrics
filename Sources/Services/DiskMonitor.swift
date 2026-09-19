@@ -1,7 +1,7 @@
 import Foundation
 import Darwin
 
-public final class DiskMonitor: @unchecked Sendable {
+public final class DiskMonitor: DiskMonitoring, @unchecked Sendable {
     private var previousReadBytes: UInt64 = 0
     private var previousWriteBytes: UInt64 = 0
     private var previousTimestamp: Date = Date()
@@ -80,7 +80,101 @@ public final class DiskMonitor: @unchecked Sendable {
         previousWriteBytes = currentWrite
         previousTimestamp = now
         
+        // 3. Mounted Volumes Scan (Internal & External/USB)
+        metrics.volumes = scanMountedVolumes()
+        
+        // Background trash size calculation
+        scanTrashInBackground()
+        metrics.trashBytes = cachedTrashBytes
+        
         return metrics
+    }
+    
+    private func scanMountedVolumes() -> [VolumeInfo] {
+        guard let urls = FileManager.default.mountedVolumeURLs(
+            includingResourceValuesForKeys: [
+                .volumeNameKey,
+                .volumeTotalCapacityKey,
+                .volumeAvailableCapacityKey,
+                .volumeIsInternalKey,
+                .volumeIsRemovableKey
+            ],
+            options: [.skipHiddenVolumes]
+        ) else {
+            return []
+        }
+        
+        var list: [VolumeInfo] = []
+        for url in urls {
+            guard let values = try? url.resourceValues(forKeys: [
+                .volumeNameKey,
+                .volumeTotalCapacityKey,
+                .volumeAvailableCapacityKey,
+                .volumeIsInternalKey,
+                .volumeIsRemovableKey
+            ]) else { continue }
+            
+            let name = values.volumeName ?? url.lastPathComponent
+            let total = UInt64(values.volumeTotalCapacity ?? 0)
+            let free = UInt64(values.volumeAvailableCapacity ?? 0)
+            let isInternal = values.volumeIsInternal ?? true
+            let isRemovable = values.volumeIsRemovable ?? false
+            
+            if total > 0 {
+                list.append(VolumeInfo(
+                    name: name,
+                    url: url,
+                    isInternal: isInternal,
+                    isRemovable: isRemovable,
+                    totalBytes: total,
+                    freeBytes: free
+                ))
+            }
+        }
+        return list.sorted { $0.totalBytes > $1.totalBytes }
+    }
+    
+    public static func ejectVolume(url: URL) {
+        NSWorkspace.shared.unmountAndEjectDevice(at: url) { error in
+            if let error = error {
+                NSLog("Failed to eject \(url.path): \(error.localizedDescription)")
+            }
+        }
+    }
+    
+    private var cachedTrashBytes: UInt64 = 0
+    private var lastTrashScan = Date.distantPast
+    private var isScanningTrash = false
+
+    private func scanTrashInBackground() {
+        guard !isScanningTrash && Date().timeIntervalSince(lastTrashScan) >= 10.0 else { return }
+        isScanningTrash = true
+        DispatchQueue.global(qos: .utility).async { [weak self] in
+            var size: UInt64 = 0
+            if let trashURL = FileManager.default.urls(for: .trashDirectory, in: .userDomainMask).first,
+               let enumerator = FileManager.default.enumerator(at: trashURL, includingPropertiesForKeys: [.fileSizeKey, .isRegularFileKey], options: [.skipsHiddenFiles]) {
+                for case let fileURL as URL in enumerator {
+                    if let res = try? fileURL.resourceValues(forKeys: [.fileSizeKey]), let s = res.fileSize {
+                        size += UInt64(s)
+                    }
+                }
+            }
+            self?.lock.lock()
+            self?.cachedTrashBytes = size
+            self?.lastTrashScan = Date()
+            self?.isScanningTrash = false
+            self?.lock.unlock()
+        }
+    }
+    
+    public static func emptyTrash() {
+        DispatchQueue.global(qos: .userInitiated).async {
+            let script = "tell application \"Finder\" to empty trash"
+            if let appleScript = NSAppleScript(source: script) {
+                var err: NSDictionary?
+                appleScript.executeAndReturnError(&err)
+            }
+        }
     }
     
     private func readDiskIOStats() -> (UInt64, UInt64) {

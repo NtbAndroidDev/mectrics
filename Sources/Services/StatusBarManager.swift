@@ -18,6 +18,7 @@ public final class StatusBarManager: NSObject, NSPopoverDelegate {
     private var networkItem: NSStatusItem!
     private var batteryItem: NSStatusItem!
     private var sensorItem: NSStatusItem!
+    private var fansItem: NSStatusItem!
     private var gpuItem: NSStatusItem!
     
     // Popovers
@@ -28,6 +29,7 @@ public final class StatusBarManager: NSObject, NSPopoverDelegate {
     private var networkPopover: NSPopover!
     private var batteryPopover: NSPopover!
     private var sensorPopover: NSPopover!
+    private var fansPopover: NSPopover!
     private var gpuPopover: NSPopover!
     
     // Hosting Views
@@ -38,6 +40,7 @@ public final class StatusBarManager: NSObject, NSPopoverDelegate {
     private var networkHosting: NSHostingView<AnyView>?
     private var batteryHosting: NSHostingView<AnyView>?
     private var sensorHosting: NSHostingView<AnyView>?
+    private var fansHosting: NSHostingView<AnyView>?
     private var gpuHosting: NSHostingView<AnyView>?
     
     public override init() {
@@ -71,6 +74,9 @@ public final class StatusBarManager: NSObject, NSPopoverDelegate {
         sensorItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         setupButton(sensorItem.button, action: #selector(toggleSensor))
         
+        fansItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
+        setupButton(fansItem.button, action: #selector(toggleFans))
+        
         gpuItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         setupButton(gpuItem.button, action: #selector(toggleGPU))
     }
@@ -79,7 +85,7 @@ public final class StatusBarManager: NSObject, NSPopoverDelegate {
         guard let button = button else { return }
         button.target = self
         button.action = action
-        button.sendAction(on: [.leftMouseUp])
+        button.sendAction(on: [.leftMouseUp, .rightMouseUp])
     }
     
     private func setupPopovers() {
@@ -90,6 +96,7 @@ public final class StatusBarManager: NSObject, NSPopoverDelegate {
         networkPopover = createPopover(contentView: NetworkPopoverView(monitor: monitor))
         batteryPopover = createPopover(contentView: BatteryPopoverView(monitor: monitor))
         sensorPopover = createPopover(contentView: SensorPopoverView(monitor: monitor))
+        fansPopover = createPopover(contentView: FansPopoverView(monitor: monitor))
         gpuPopover = createPopover(contentView: GPUPopoverView(monitor: monitor))
     }
     
@@ -111,10 +118,10 @@ public final class StatusBarManager: NSObject, NSPopoverDelegate {
     
     private func observeMonitor() {
         monitor.objectWillChange
-            .receive(on: RunLoop.main)
+            .throttle(for: .milliseconds(150), scheduler: RunLoop.main, latest: true)
             .sink { [weak self] _ in
-                self?.updateAllViews()
                 self?.updateVisibility()
+                self?.updateAllViews()
             }
             .store(in: &cancellables)
     }
@@ -129,125 +136,161 @@ public final class StatusBarManager: NSObject, NSPopoverDelegate {
         networkItem.isVisible = !compact && monitor.showNetworkInMenuBar
         batteryItem.isVisible = !compact && monitor.showBatteryInMenuBar && monitor.battery.isPresent
         sensorItem.isVisible = !compact && monitor.showSensorInMenuBar
+        fansItem.isVisible = !compact && monitor.showFansInMenuBar && !monitor.sensor.fans.isEmpty
         gpuItem.isVisible = !compact && monitor.showGPUInMenuBar
     }
     
     public func updateAllViews() {
+        let compact = monitor.useCompactHealthBar
+        
         // 1. Compact Health View
-        let chActive = (activeStatusItem === compactHealthItem)
-        let chView = AnyView(
-            CompactHealthBarView(statusLevel: monitor.health.statusLevel, isActive: chActive)
-        )
-        setHostingView(for: compactHealthItem, hosting: &compactHealthHosting, view: chView, width: chActive ? 28 : 22)
+        if compact {
+            let chActive = (activeStatusItem === compactHealthItem)
+            let chView = AnyView(
+                CompactHealthBarView(statusLevel: monitor.health.statusLevel, isActive: chActive)
+            )
+            setHostingView(for: compactHealthItem, hosting: &compactHealthHosting, view: chView, width: chActive ? 28 : 22)
+            return
+        }
         
         // 2. Disk View
-        let diskActive = (activeStatusItem === diskItem)
-        let diskText = (monitor.diskDisplayMode == .percentage)
-            ? String(format: "%.0f%%", monitor.disk.usagePercentage)
-            : "\(monitor.disk.freeBytes / (1024 * 1024 * 1024))GB"
-        let dView = AnyView(
-            MenuBarItemView(
-                icon: "internaldrive",
-                valueText: diskText,
-                tintColor: MectricsTheme.coral,
-                isActive: diskActive
+        if monitor.showDiskInMenuBar {
+            let diskActive = (activeStatusItem === diskItem)
+            let diskText = (monitor.diskDisplayMode == .percentage)
+                ? String(format: "%.0f%%", monitor.disk.usagePercentage)
+                : "\(monitor.disk.freeBytes / (1024 * 1024 * 1024))GB"
+            let dView = AnyView(
+                MenuBarItemView(
+                    icon: "internaldrive",
+                    valueText: diskText,
+                    tintColor: MectricsTheme.coral,
+                    isActive: diskActive
+                )
             )
-        )
-        setHostingView(for: diskItem, hosting: &diskHosting, view: dView, width: diskActive ? 64 : 56)
+            setHostingView(for: diskItem, hosting: &diskHosting, view: dView, width: diskActive ? 64 : 56)
+        }
         
         // 3. Memory View
-        let memActive = (activeStatusItem === memoryItem)
-        let mView = AnyView(
-            MenuBarItemView(
-                icon: "memorychip",
-                valueText: String(format: "%.0f%%", monitor.memory.usagePercentage),
-                sparklineValues: monitor.showMemorySparkline ? monitor.memoryHistory.values : nil,
-                isBoxedSparkline: true,
-                tintColor: MectricsTheme.coral,
-                isActive: memActive
+        if monitor.showMemoryInMenuBar {
+            let memActive = (activeStatusItem === memoryItem)
+            let mView = AnyView(
+                MenuBarItemView(
+                    icon: "memorychip",
+                    valueText: String(format: "%.0f%%", monitor.memory.usagePercentage),
+                    sparklineValues: monitor.showMemorySparkline ? monitor.memoryHistory.values : nil,
+                    isBoxedSparkline: true,
+                    tintColor: MectricsTheme.coral,
+                    isActive: memActive
+                )
             )
-        )
-        let memWidth: CGFloat = monitor.showMemorySparkline ? (memActive ? 82 : 74) : (memActive ? 58 : 50)
-        setHostingView(for: memoryItem, hosting: &memoryHosting, view: mView, width: memWidth)
+            let memWidth: CGFloat = monitor.showMemorySparkline ? (memActive ? 82 : 74) : (memActive ? 58 : 50)
+            setHostingView(for: memoryItem, hosting: &memoryHosting, view: mView, width: memWidth)
+        }
         
         // 4. CPU View
-        let cpuActive = (activeStatusItem === cpuItem)
-        let cView = AnyView(
-            MenuBarItemView(
-                icon: "cpu",
-                valueText: String(format: "%.0f%%", monitor.cpu.totalUsage),
-                sparklineValues: monitor.showCPUSparkline ? monitor.cpuHistory.values : nil,
-                isBoxedSparkline: false,
-                tintColor: MectricsTheme.coral,
-                isActive: cpuActive
+        if monitor.showCPUInMenuBar {
+            let cpuActive = (activeStatusItem === cpuItem)
+            let cView = AnyView(
+                MenuBarItemView(
+                    icon: "cpu",
+                    valueText: String(format: "%.0f%%", monitor.cpu.totalUsage),
+                    sparklineValues: monitor.showCPUSparkline ? monitor.cpuHistory.values : nil,
+                    isBoxedSparkline: false,
+                    tintColor: MectricsTheme.coral,
+                    isActive: cpuActive
+                )
             )
-        )
-        let cpuWidth: CGFloat = monitor.showCPUSparkline ? (cpuActive ? 86 : 78) : (cpuActive ? 58 : 50)
-        setHostingView(for: cpuItem, hosting: &cpuHosting, view: cView, width: cpuWidth)
+            let cpuWidth: CGFloat = monitor.showCPUSparkline ? (cpuActive ? 86 : 78) : (cpuActive ? 58 : 50)
+            setHostingView(for: cpuItem, hosting: &cpuHosting, view: cView, width: cpuWidth)
+        }
         
         // 5. Network View
-        let netActive = (activeStatusItem === networkItem)
-        let nView: AnyView
-        if monitor.networkDisplayMode == .stacked {
-            nView = AnyView(
-                NetworkMenuBarView(
-                    downloadBytes: monitor.network.downloadBytesPerSec,
-                    uploadBytes: monitor.network.uploadBytesPerSec,
-                    tintColor: MectricsTheme.coral,
-                    isActive: netActive
+        if monitor.showNetworkInMenuBar {
+            let netActive = (activeStatusItem === networkItem)
+            let nView: AnyView
+            if monitor.networkDisplayMode == .stacked {
+                nView = AnyView(
+                    NetworkMenuBarView(
+                        downloadBytes: monitor.network.downloadBytesPerSec,
+                        uploadBytes: monitor.network.uploadBytesPerSec,
+                        tintColor: MectricsTheme.coral,
+                        isActive: netActive
+                    )
                 )
-            )
-            setHostingView(for: networkItem, hosting: &networkHosting, view: nView, width: netActive ? 66 : 58)
-        } else {
-            let total = monitor.network.downloadBytesPerSec + monitor.network.uploadBytesPerSec
-            nView = AnyView(
-                MenuBarItemView(
-                    icon: "arrow.up.arrow.down",
-                    valueText: formatSingleRate(total),
-                    tintColor: MectricsTheme.coral,
-                    isActive: netActive
+                setHostingView(for: networkItem, hosting: &networkHosting, view: nView, width: netActive ? 66 : 58)
+            } else {
+                let total = monitor.network.downloadBytesPerSec + monitor.network.uploadBytesPerSec
+                nView = AnyView(
+                    MenuBarItemView(
+                        icon: "arrow.up.arrow.down",
+                        valueText: formatSingleRate(total),
+                        tintColor: MectricsTheme.coral,
+                        isActive: netActive
+                    )
                 )
-            )
-            setHostingView(for: networkItem, hosting: &networkHosting, view: nView, width: netActive ? 70 : 62)
+                setHostingView(for: networkItem, hosting: &networkHosting, view: nView, width: netActive ? 70 : 62)
+            }
         }
         
         // 6. Battery View
-        let batActive = (activeStatusItem === batteryItem)
-        let bView = AnyView(
-            MenuBarItemView(
-                icon: monitor.battery.isCharging ? "battery.100percent.bolt" : "battery.100percent",
-                valueText: String(format: "%.0f%%", monitor.battery.percentage),
-                tintColor: MectricsTheme.coral,
-                isActive: batActive
+        if monitor.showBatteryInMenuBar && monitor.battery.isPresent {
+            let batActive = (activeStatusItem === batteryItem)
+            let bView = AnyView(
+                MenuBarItemView(
+                    icon: monitor.battery.isCharging ? "battery.100percent.bolt" : "battery.100percent",
+                    valueText: String(format: "%.0f%%", monitor.battery.percentage),
+                    tintColor: MectricsTheme.coral,
+                    isActive: batActive
+                )
             )
-        )
-        setHostingView(for: batteryItem, hosting: &batteryHosting, view: bView, width: batActive ? 58 : 50)
+            setHostingView(for: batteryItem, hosting: &batteryHosting, view: bView, width: batActive ? 58 : 50)
+        }
         
         // 7. Sensor View
-        let senActive = (activeStatusItem === sensorItem)
-        let sView = AnyView(
-            MenuBarItemView(
-                icon: "thermometer.medium",
-                valueText: "\(Int(monitor.sensor.cpuTemperature))°C",
-                sparklineValues: monitor.tempHistory.values,
-                tintColor: MectricsTheme.coral,
-                isActive: senActive
+        if monitor.showSensorInMenuBar {
+            let senActive = (activeStatusItem === sensorItem)
+            let sView = AnyView(
+                MenuBarItemView(
+                    icon: "thermometer.medium",
+                    valueText: monitor.formatTemperature(monitor.sensor.cpuTemperature),
+                    sparklineValues: monitor.tempHistory.values,
+                    tintColor: MectricsTheme.coral,
+                    isActive: senActive
+                )
             )
-        )
-        setHostingView(for: sensorItem, hosting: &sensorHosting, view: sView, width: senActive ? 62 : 54)
+            setHostingView(for: sensorItem, hosting: &sensorHosting, view: sView, width: senActive ? 62 : 54)
+        }
         
-        // 8. GPU View
-        let gpuActive = (activeStatusItem === gpuItem)
-        let gView = AnyView(
-            MenuBarItemView(
-                icon: "display",
-                valueText: String(format: "%.0f%%", monitor.gpu.usagePercentage),
-                sparklineValues: monitor.gpuHistory.values,
-                tintColor: MectricsTheme.coral,
-                isActive: gpuActive
+        // 8. Fans View
+        if monitor.showFansInMenuBar && !monitor.sensor.fans.isEmpty {
+            let fanActive = (activeStatusItem === fansItem)
+            let fastest = monitor.sensor.fans.map(\.currentRPM).max() ?? 0
+            let fanText = fastest > 0 ? "\(fastest)" : "0"
+            let fView = AnyView(
+                MenuBarItemView(
+                    icon: "fan.fill",
+                    valueText: "\(fanText)R",
+                    tintColor: MectricsTheme.coral,
+                    isActive: fanActive
+                )
             )
-        )
-        setHostingView(for: gpuItem, hosting: &gpuHosting, view: gView, width: gpuActive ? 60 : 52)
+            setHostingView(for: fansItem, hosting: &fansHosting, view: fView, width: fanActive ? 58 : 50)
+        }
+        
+        // 9. GPU View
+        if monitor.showGPUInMenuBar {
+            let gpuActive = (activeStatusItem === gpuItem)
+            let gView = AnyView(
+                MenuBarItemView(
+                    icon: "display",
+                    valueText: String(format: "%.0f%%", monitor.gpu.usagePercentage),
+                    sparklineValues: monitor.gpuHistory.values,
+                    tintColor: MectricsTheme.coral,
+                    isActive: gpuActive
+                )
+            )
+            setHostingView(for: gpuItem, hosting: &gpuHosting, view: gView, width: gpuActive ? 60 : 52)
+        }
     }
     
     private func setHostingView(
@@ -273,7 +316,9 @@ public final class StatusBarManager: NSObject, NSPopoverDelegate {
             hosting = h
         }
         
-        item.length = width
+        if item.length != width {
+            item.length = width
+        }
     }
     
     private func formatSingleRate(_ bytes: Double) -> String {
@@ -294,10 +339,17 @@ public final class StatusBarManager: NSObject, NSPopoverDelegate {
     @objc private func toggleNetwork() { toggle(networkPopover, for: networkItem) }
     @objc private func toggleBattery() { toggle(batteryPopover, for: batteryItem) }
     @objc private func toggleSensor() { toggle(sensorPopover, for: sensorItem) }
+    @objc private func toggleFans() { toggle(fansPopover, for: fansItem) }
     @objc private func toggleGPU() { toggle(gpuPopover, for: gpuItem) }
     
     private func toggle(_ popover: NSPopover, for item: NSStatusItem) {
         guard let button = item.button else { return }
+        
+        let isRightClick = (NSApp.currentEvent?.type == .rightMouseUp)
+        if isRightClick {
+            showContextMenu(for: item)
+            return
+        }
         
         if popover.isShown {
             popover.performClose(nil)
@@ -312,8 +364,120 @@ public final class StatusBarManager: NSObject, NSPopoverDelegate {
         }
     }
     
+    private func showContextMenu(for item: NSStatusItem) {
+        guard let button = item.button else { return }
+        closeAllPopovers()
+        
+        let menu = NSMenu()
+        let isVi = LocalizationManager.shared.currentLanguage == .vietnamese
+        
+        let settingsItem = NSMenuItem(title: isVi ? "Cài đặt Mectrics..." : "Mectrics Settings...", action: #selector(openSettingsAction), keyEquivalent: ",")
+        settingsItem.target = self
+        settingsItem.image = NSImage(systemSymbolName: "gearshape", accessibilityDescription: nil)
+        menu.addItem(settingsItem)
+        
+        let diagItem = NSMenuItem(title: isVi ? "Chẩn đoán hệ thống..." : "System Diagnostics...", action: #selector(openDiagnosticsAction), keyEquivalent: "d")
+        diagItem.target = self
+        diagItem.image = NSImage(systemSymbolName: "stethoscope", accessibilityDescription: nil)
+        menu.addItem(diagItem)
+        
+        let logItem = NSMenuItem(title: isVi ? "Nhật ký Cảnh báo..." : "Attention Log...", action: #selector(openAttentionLogAction), keyEquivalent: "l")
+        logItem.target = self
+        logItem.image = NSImage(systemSymbolName: "bell.badge", accessibilityDescription: nil)
+        menu.addItem(logItem)
+        
+        // Anti-Sleep / Keep Awake Mode
+        let keepAwakeActive = SleepBlocker.shared.isKeepAwakeActive
+        let keepAwakeItem = NSMenuItem(
+            title: isVi ? "Chống ngủ máy (Keep Awake)" : "Keep Awake (Anti-Sleep)",
+            action: #selector(toggleKeepAwakeAction),
+            keyEquivalent: "k"
+        )
+        keepAwakeItem.target = self
+        keepAwakeItem.image = NSImage(systemSymbolName: keepAwakeActive ? "cup.and.saucer.fill" : "cup.and.saucer", accessibilityDescription: nil)
+        keepAwakeItem.state = keepAwakeActive ? .on : .off
+        menu.addItem(keepAwakeItem)
+        
+        menu.addItem(NSMenuItem.separator())
+        
+        // Quick Theme Selection
+        let themeMenu = NSMenu()
+        for theme in AccentTheme.allCases {
+            let tItem = NSMenuItem(title: theme.rawValue, action: #selector(selectThemeAction(_:)), keyEquivalent: "")
+            tItem.target = self
+            tItem.representedObject = theme.rawValue
+            if ThemeManager.shared.currentTheme == theme {
+                tItem.state = .on
+            }
+            themeMenu.addItem(tItem)
+        }
+        let themeSubmenuItem = NSMenuItem(title: isVi ? "Màu sắc chủ đạo" : "Accent Color", action: nil, keyEquivalent: "")
+        themeSubmenuItem.image = NSImage(systemSymbolName: "paintpalette", accessibilityDescription: nil)
+        themeSubmenuItem.submenu = themeMenu
+        menu.addItem(themeSubmenuItem)
+        
+        // Quick Language Selection
+        let langMenu = NSMenu()
+        for lang in AppLanguage.allCases {
+            let lItem = NSMenuItem(title: lang.displayName, action: #selector(selectLanguageAction(_:)), keyEquivalent: "")
+            lItem.target = self
+            lItem.representedObject = lang.rawValue
+            if LocalizationManager.shared.currentLanguage == lang {
+                lItem.state = .on
+            }
+            langMenu.addItem(lItem)
+        }
+        let langSubmenuItem = NSMenuItem(title: isVi ? "Ngôn ngữ" : "Language", action: nil, keyEquivalent: "")
+        langSubmenuItem.image = NSImage(systemSymbolName: "globe", accessibilityDescription: nil)
+        langSubmenuItem.submenu = langMenu
+        menu.addItem(langSubmenuItem)
+        
+        menu.addItem(NSMenuItem.separator())
+        
+        let quitItem = NSMenuItem(title: isVi ? "Thoát Mectrics" : "Quit Mectrics", action: #selector(quitAppAction), keyEquivalent: "q")
+        quitItem.target = self
+        quitItem.image = NSImage(systemSymbolName: "power", accessibilityDescription: nil)
+        menu.addItem(quitItem)
+        
+        menu.popUp(positioning: nil, at: NSPoint(x: 0, y: button.bounds.height + 4), in: button)
+    }
+    
+    @objc private func openSettingsAction() {
+        AppState.shared.openSettings(tab: .menuBar)
+    }
+    
+    @objc private func openDiagnosticsAction() {
+        AppState.shared.openDiagnostics()
+    }
+    
+    @objc private func openAttentionLogAction() {
+        AppState.shared.openAttentionLog()
+    }
+    
+    @objc private func toggleKeepAwakeAction() {
+        SleepBlocker.shared.toggle()
+    }
+    
+    @objc private func selectThemeAction(_ sender: NSMenuItem) {
+        if let raw = sender.representedObject as? String, let theme = AccentTheme(rawValue: raw) {
+            ThemeManager.shared.currentTheme = theme
+            updateAllViews()
+        }
+    }
+    
+    @objc private func selectLanguageAction(_ sender: NSMenuItem) {
+        if let raw = sender.representedObject as? String, let lang = AppLanguage(rawValue: raw) {
+            LocalizationManager.shared.currentLanguage = lang
+            updateAllViews()
+        }
+    }
+    
+    @objc private func quitAppAction() {
+        NSApplication.shared.terminate(nil)
+    }
+    
     public func closeAllPopovers() {
-        [compactHealthPopover, diskPopover, memoryPopover, cpuPopover, networkPopover, batteryPopover, sensorPopover, gpuPopover].forEach {
+        [compactHealthPopover, diskPopover, memoryPopover, cpuPopover, networkPopover, batteryPopover, sensorPopover, fansPopover, gpuPopover].forEach {
             $0?.performClose(nil)
         }
     }

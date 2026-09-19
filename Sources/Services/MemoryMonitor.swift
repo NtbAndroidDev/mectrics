@@ -1,7 +1,7 @@
 import Foundation
 import Darwin
 
-public final class MemoryMonitor: @unchecked Sendable {
+public final class MemoryMonitor: MemoryMonitoring, @unchecked Sendable {
     private let pageSize: UInt64
     private let totalMemory: UInt64
     
@@ -12,7 +12,9 @@ public final class MemoryMonitor: @unchecked Sendable {
         self.totalMemory = size > 0 ? size : 16 * 1024 * 1024 * 1024
         
         var pSize: vm_size_t = 0
-        _ = host_page_size(mach_host_self(), &pSize)
+        let initPort = mach_host_self()
+        _ = host_page_size(initPort, &pSize)
+        mach_port_deallocate(mach_task_self_, initPort)
         self.pageSize = UInt64(pSize > 0 ? pSize : 4096)
     }
     
@@ -20,12 +22,15 @@ public final class MemoryMonitor: @unchecked Sendable {
         var metrics = MemoryMetrics()
         metrics.totalBytes = totalMemory
         
+        let hostPort = mach_host_self()
+        defer { mach_port_deallocate(mach_task_self_, hostPort) }
+        
         var vmStat = vm_statistics64()
         var count = mach_msg_type_number_t(MemoryLayout<vm_statistics64_data_t>.size / MemoryLayout<integer_t>.size)
         
         let result = withUnsafeMutablePointer(to: &vmStat) {
             $0.withMemoryRebound(to: integer_t.self, capacity: Int(count)) {
-                host_statistics64(mach_host_self(), HOST_VM_INFO64, $0, &count)
+                host_statistics64(hostPort, HOST_VM_INFO64, $0, &count)
             }
         }
         

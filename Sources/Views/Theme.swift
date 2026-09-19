@@ -63,6 +63,7 @@ public final class ThemeManager: ObservableObject {
     public var purgeableColor: Color { currentTheme.purgeableColor }
 }
 
+@MainActor
 public enum MectricsTheme {
     /// Dynamic Mectrics Accent Colors
     public static var coral: Color { ThemeManager.shared.coral }
@@ -86,19 +87,42 @@ public enum MectricsTheme {
     public static let popoverCornerRadius: CGFloat = 16
 }
 
+@MainActor
 public struct PopoverContainerModifier: ViewModifier {
     public func body(content: Content) -> some View {
         content
             .padding(.horizontal, 16)
             .padding(.vertical, 14)
             .frame(width: MectricsTheme.popoverWidth)
-            .background(MectricsTheme.popoverBackground)
+            .background(
+                RoundedRectangle(cornerRadius: MectricsTheme.popoverCornerRadius)
+                    .fill(Color(red: 0.10, green: 0.10, blue: 0.12).opacity(0.82))
+                    .background(.ultraThinMaterial)
+            )
+            .clipShape(RoundedRectangle(cornerRadius: MectricsTheme.popoverCornerRadius))
+            .overlay(
+                RoundedRectangle(cornerRadius: MectricsTheme.popoverCornerRadius)
+                    .stroke(
+                        LinearGradient(
+                            colors: [
+                                Color.white.opacity(0.20),
+                                Color.white.opacity(0.04)
+                            ],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        ),
+                        lineWidth: 1
+                    )
+            )
+            .shadow(color: Color.black.opacity(0.35), radius: 14, x: 0, y: 6)
             .preferredColorScheme(.dark)
     }
 }
 
 extension View {
+    @MainActor
     public func mectricsPopoverStyle() -> some View {
         self.modifier(PopoverContainerModifier())
     }
 }
+

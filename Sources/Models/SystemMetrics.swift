@@ -11,6 +11,8 @@ public struct CPUMetrics: Sendable {
     public var temperature: Double = 0.0 // Celsius
     public var physicalCores: Int = 8
     public var logicalCores: Int = 8
+    public var pCores: Int = 0
+    public var eCores: Int = 0
     public var busiestCoreUsage: Double = 0.0
     public var modelName: String = "Apple Silicon"
 }
@@ -43,12 +45,18 @@ public struct BatteryMetrics: Sendable {
     public var isCharging: Bool = false
     public var isPluggedIn: Bool = true
     public var cycleCount: Int = 0
+    public var maxCycles: Int = 1000
     public var healthPercentage: Double = 100.0
+    public var nominalCapacityMAh: Int = 0
+    public var designCapacityMAh: Int = 0
+    public var remainingCapacityMAh: Int = 0
     public var temperature: Double = 30.0 // Celsius
     public var powerSource: String = "AC Power"
     public var condition: String = "Normal"
     public var timeRemainingMinutes: Int? = nil // nil if calculating or AC
     public var wattage: Double = 0.0 // Watts
+    public var chargerWatts: Int? = nil
+    public var isLowPowerMode: Bool = false
 }
 
 // MARK: - Network Metrics
@@ -59,10 +67,43 @@ public struct NetworkMetrics: Sendable {
     public var totalUploadedBytes: UInt64 = 0
     public var primaryInterfaceName: String = "en0"
     public var ipv4Address: String = "127.0.0.1"
+    public var publicIpAddress: String? = nil
+    public var gatewayIpAddress: String? = nil
+    public var wifiSsid: String? = nil
+    public var wifiRssi: Int? = nil
+    public var wifiTxRate: Double? = nil
     public var isConnected: Bool = true
+    public var pingLatencyMs: Double? = nil
 }
 
 // MARK: - Disk Metrics
+public struct VolumeInfo: Identifiable, Sendable, Hashable {
+    public var id: String { url.path }
+    public let name: String
+    public let url: URL
+    public let isInternal: Bool
+    public let isRemovable: Bool
+    public let totalBytes: UInt64
+    public let freeBytes: UInt64
+    
+    public init(name: String, url: URL, isInternal: Bool, isRemovable: Bool, totalBytes: UInt64, freeBytes: UInt64) {
+        self.name = name
+        self.url = url
+        self.isInternal = isInternal
+        self.isRemovable = isRemovable
+        self.totalBytes = totalBytes
+        self.freeBytes = freeBytes
+    }
+    
+    public var usedBytes: UInt64 {
+        totalBytes >= freeBytes ? (totalBytes - freeBytes) : 0
+    }
+    
+    public var usagePercentage: Double {
+        totalBytes > 0 ? (Double(usedBytes) / Double(totalBytes)) * 100.0 : 0.0
+    }
+}
+
 public struct DiskMetrics: Sendable {
     public var totalBytes: UInt64 = 0
     public var usedBytes: UInt64 = 0
@@ -73,6 +114,8 @@ public struct DiskMetrics: Sendable {
     public var writeBytesPerSec: Double = 0.0
     public var volumeName: String = "Macintosh HD"
     public var fileSystem: String = "APFS"
+    public var trashBytes: UInt64 = 0
+    public var volumes: [VolumeInfo] = []
 }
 
 // MARK: - GPU Metrics

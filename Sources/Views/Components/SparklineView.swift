@@ -34,32 +34,48 @@ public struct SparklineView: View {
             
             let stepX = size.width / CGFloat(values.count - 1)
             
-            var linePath = Path()
-            var fillPath = Path()
-            
-            for (index, val) in values.enumerated() {
+            let points: [CGPoint] = values.enumerated().map { index, val in
                 let clamped = max(minVal, min(maxVal, val))
                 let normalizedY = 1.0 - CGFloat((clamped - minVal) / range)
                 let x = CGFloat(index) * stepX
                 let y = normalizedY * (size.height - 4) + 2
+                return CGPoint(x: x, y: y)
+            }
+            
+            guard points.count >= 2 else { return }
+            
+            var linePath = Path()
+            var fillPath = Path()
+            
+            linePath.move(to: points[0])
+            fillPath.move(to: CGPoint(x: points[0].x, y: size.height))
+            fillPath.addLine(to: points[0])
+            
+            for i in 0..<points.count - 1 {
+                let current = points[i]
+                let next = points[i + 1]
+                let midPoint = CGPoint(x: (current.x + next.x) / 2, y: (current.y + next.y) / 2)
                 
-                if index == 0 {
-                    linePath.move(to: CGPoint(x: x, y: y))
-                    fillPath.move(to: CGPoint(x: x, y: size.height))
-                    fillPath.addLine(to: CGPoint(x: x, y: y))
+                if i == 0 {
+                    linePath.addLine(to: midPoint)
+                    fillPath.addLine(to: midPoint)
                 } else {
-                    linePath.addLine(to: CGPoint(x: x, y: y))
-                    fillPath.addLine(to: CGPoint(x: x, y: y))
+                    linePath.addQuadCurve(to: midPoint, control: current)
+                    fillPath.addQuadCurve(to: midPoint, control: current)
                 }
             }
             
-            fillPath.addLine(to: CGPoint(x: size.width, y: size.height))
-            fillPath.closeSubpath()
+            if let last = points.last {
+                linePath.addLine(to: last)
+                fillPath.addLine(to: last)
+                fillPath.addLine(to: CGPoint(x: last.x, y: size.height))
+                fillPath.closeSubpath()
+            }
             
             if showFill {
                 let grad = Gradient(colors: [
-                    strokeColor.opacity(0.35),
-                    strokeColor.opacity(0.02)
+                    strokeColor.opacity(0.40),
+                    strokeColor.opacity(0.0)
                 ])
                 context.fill(
                     fillPath,
