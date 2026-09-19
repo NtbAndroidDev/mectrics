@@ -223,3 +223,61 @@ public struct CompactHealthBarView: View {
             .clipShape(Capsule())
     }
 }
+
+public struct UnifiedSampleMenuBarView: View {
+    public let cpuUsage: Double
+    public let memUsage: Double
+    public var isActive: Bool
+    
+    public init(cpuUsage: Double, memUsage: Double, isActive: Bool = false) {
+        self.cpuUsage = cpuUsage
+        self.memUsage = memUsage
+        self.isActive = isActive
+    }
+    
+    public var body: some View {
+        HStack(spacing: 6) {
+            // [ M ] Brand Badge (Square rounded badge matching sample mockup)
+            ZStack {
+                RoundedRectangle(cornerRadius: 3.5)
+                    .fill(Color(white: 0.18))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 3.5)
+                            .stroke(Color.white.opacity(0.2), lineWidth: 0.8)
+                    )
+                Text("M")
+                    .font(.system(size: 10.5, weight: .black, design: .rounded))
+                    .foregroundStyle(.white)
+            }
+            .frame(width: 17, height: 17)
+            
+            // CPU & RAM Text metrics
+            HStack(spacing: 6) {
+                HStack(spacing: 2) {
+                    Text("CPU")
+                        .font(.system(size: 10, weight: .regular, design: .monospaced))
+                        .foregroundStyle(Color.white.opacity(0.75))
+                    Text(String(format: "%.0f%%", cpuUsage))
+                        .font(.system(size: 10.5, weight: .semibold, design: .monospaced))
+                        .monospacedDigit()
+                        .foregroundStyle(.white)
+                }
+                
+                HStack(spacing: 2) {
+                    Text("RAM")
+                        .font(.system(size: 10, weight: .regular, design: .monospaced))
+                        .foregroundStyle(Color.white.opacity(0.75))
+                    Text(String(format: "%.0f%%", memUsage))
+                        .font(.system(size: 10.5, weight: .semibold, design: .monospaced))
+                        .monospacedDigit()
+                        .foregroundStyle(.white)
+                }
+            }
+        }
+        .padding(.horizontal, isActive ? 6 : 4)
+        .padding(.vertical, isActive ? 2 : 0)
+        .background(isActive ? Color.white.opacity(0.18) : Color.clear)
+        .clipShape(RoundedRectangle(cornerRadius: 5))
+    }
+}
+

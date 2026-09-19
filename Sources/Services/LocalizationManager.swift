@@ -198,6 +198,13 @@ public final class LocalizationManager: ObservableObject {
         case "Live Status Bar Preview": return isVi ? "Xem trước Thanh Menu Trực tiếp" : "Live Status Bar Preview"
         case "macOS Menu Bar": return isVi ? "Thanh Menu macOS" : "macOS Menu Bar"
         case "Display Mode": return isVi ? "Chế độ Hiển thị" : "Display Mode"
+        case "Unified Sample ([M] CPU RAM)": return isVi ? "Mẫu Chuẩn ([M] CPU RAM)" : "Unified Sample ([M] CPU RAM)"
+        case "Dual Stacked (35px Micro Slot)": return isVi ? "Xếp Tầng (Khe 35px)" : "Dual Stacked (35px Micro Slot)"
+        case "Compact Shield": return isVi ? "Khiên Gọn" : "Compact Shield"
+        case "Separate Individual Items": return isVi ? "Tách Rời Từng Mục" : "Separate Individual Items"
+        case "Unified Sample Note":
+            return isVi ? "Giao diện chính thức nguyên bản của Mectrics: Biểu tượng [M] cùng thông số CPU và RAM. Nhấn vào sẽ mở Bảng điều khiển Tổng hợp (Master Dashboard) toàn diện y như ảnh mẫu."
+                        : "Official original Mectrics design: Branded [M] badge with direct CPU and RAM vitals. Clicking reveals the comprehensive Master Dashboard popover exactly like the mockup."
         case "Compact Health Mode (Single Shield Slot)":
             return isVi ? "Chế độ Khiên gọn gàng (Một icon duy nhất)" : "Compact Health Mode (Single Shield Slot)"
         case "Compact Health Note":

@@ -11,6 +11,7 @@ public final class StatusBarManager: NSObject, NSPopoverDelegate {
     private var activeStatusItem: NSStatusItem?
     
     // Status Items
+    private var unifiedItem: NSStatusItem!
     private var compactHealthItem: NSStatusItem!
     private var dualStackedItem: NSStatusItem!
     private var diskItem: NSStatusItem!
@@ -23,6 +24,7 @@ public final class StatusBarManager: NSObject, NSPopoverDelegate {
     private var gpuItem: NSStatusItem!
     
     // Popovers
+    private var unifiedPopover: NSPopover!
     private var compactHealthPopover: NSPopover!
     private var dualStackedPopover: NSPopover!
     private var diskPopover: NSPopover!
@@ -35,6 +37,7 @@ public final class StatusBarManager: NSObject, NSPopoverDelegate {
     private var gpuPopover: NSPopover!
     
     // Hosting Views
+    private var unifiedHosting: NSHostingView<AnyView>?
     private var compactHealthHosting: NSHostingView<AnyView>?
     private var dualStackedHosting: NSHostingView<AnyView>?
     private var diskHosting: NSHostingView<AnyView>?
@@ -56,6 +59,9 @@ public final class StatusBarManager: NSObject, NSPopoverDelegate {
     }
     
     private func setupStatusItems() {
+        unifiedItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
+        setupButton(unifiedItem.button, action: #selector(toggleUnified))
+        
         compactHealthItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         setupButton(compactHealthItem.button, action: #selector(toggleCompactHealth))
         
@@ -95,6 +101,7 @@ public final class StatusBarManager: NSObject, NSPopoverDelegate {
     }
     
     private func setupPopovers() {
+        unifiedPopover = createPopover(contentView: MasterDashboardPopoverView(monitor: monitor))
         compactHealthPopover = createPopover(contentView: CompactHealthPopoverView(monitor: monitor))
         dualStackedPopover = createPopover(contentView: MasterDashboardPopoverView(monitor: monitor))
         diskPopover = createPopover(contentView: DiskPopoverView(monitor: monitor))
@@ -134,26 +141,81 @@ public final class StatusBarManager: NSObject, NSPopoverDelegate {
     }
     
     public func updateVisibility() {
-        let compact = monitor.useCompactHealthBar
-        
-        compactHealthItem.isVisible = compact
-        dualStackedItem.isVisible = !compact && monitor.showDualStackedMenuBar
-        diskItem.isVisible = !compact && monitor.showDiskInMenuBar
-        memoryItem.isVisible = !compact && monitor.showMemoryInMenuBar
-        cpuItem.isVisible = !compact && monitor.showCPUInMenuBar
-        networkItem.isVisible = !compact && monitor.showNetworkInMenuBar
-        batteryItem.isVisible = !compact && monitor.showBatteryInMenuBar && monitor.battery.isPresent
-        sensorItem.isVisible = !compact && monitor.showSensorInMenuBar
-        fansItem.isVisible = !compact && monitor.showFansInMenuBar && !monitor.sensor.fans.isEmpty
-        gpuItem.isVisible = !compact && monitor.showGPUInMenuBar
+        switch monitor.menuBarMode {
+        case .unified:
+            unifiedItem.isVisible = true
+            compactHealthItem.isVisible = false
+            dualStackedItem.isVisible = false
+            diskItem.isVisible = false
+            memoryItem.isVisible = false
+            cpuItem.isVisible = false
+            networkItem.isVisible = false
+            batteryItem.isVisible = false
+            sensorItem.isVisible = false
+            fansItem.isVisible = false
+            gpuItem.isVisible = false
+            
+        case .dualStacked:
+            unifiedItem.isVisible = false
+            compactHealthItem.isVisible = false
+            dualStackedItem.isVisible = true
+            diskItem.isVisible = false
+            memoryItem.isVisible = false
+            cpuItem.isVisible = false
+            networkItem.isVisible = false
+            batteryItem.isVisible = false
+            sensorItem.isVisible = false
+            fansItem.isVisible = false
+            gpuItem.isVisible = false
+            
+        case .compactHealth:
+            unifiedItem.isVisible = false
+            compactHealthItem.isVisible = true
+            dualStackedItem.isVisible = false
+            diskItem.isVisible = false
+            memoryItem.isVisible = false
+            cpuItem.isVisible = false
+            networkItem.isVisible = false
+            batteryItem.isVisible = false
+            sensorItem.isVisible = false
+            fansItem.isVisible = false
+            gpuItem.isVisible = false
+            
+        case .separate:
+            unifiedItem.isVisible = false
+            compactHealthItem.isVisible = false
+            dualStackedItem.isVisible = false
+            diskItem.isVisible = monitor.showDiskInMenuBar
+            memoryItem.isVisible = monitor.showMemoryInMenuBar
+            cpuItem.isVisible = monitor.showCPUInMenuBar
+            networkItem.isVisible = monitor.showNetworkInMenuBar
+            batteryItem.isVisible = monitor.showBatteryInMenuBar && monitor.battery.isPresent
+            sensorItem.isVisible = monitor.showSensorInMenuBar
+            fansItem.isVisible = monitor.showFansInMenuBar && !monitor.sensor.fans.isEmpty
+            gpuItem.isVisible = monitor.showGPUInMenuBar
+        }
     }
     
     public func updateAllViews() {
-        let compact = monitor.useCompactHealthBar
+        let mode = monitor.menuBarMode
         let style = monitor.menuBarDisplayStyle
         
+        // 0. Unified Sample Mode ([M] CPU % RAM %)
+        if mode == .unified {
+            let uActive = (activeStatusItem === unifiedItem)
+            let uView = AnyView(
+                UnifiedSampleMenuBarView(
+                    cpuUsage: monitor.cpu.totalUsage,
+                    memUsage: monitor.memory.usagePercentage,
+                    isActive: uActive
+                )
+            )
+            setHostingView(for: unifiedItem, hosting: &unifiedHosting, view: uView, width: uActive ? 134 : 126)
+            return
+        }
+        
         // 1. Compact Health View
-        if compact {
+        if mode == .compactHealth {
             let chActive = (activeStatusItem === compactHealthItem)
             let chView = AnyView(
                 CompactHealthBarView(statusLevel: monitor.health.statusLevel, isActive: chActive)
@@ -163,7 +225,7 @@ public final class StatusBarManager: NSObject, NSPopoverDelegate {
         }
         
         // 2. Dual Stacked View (CPU & RAM 35px Mini Item)
-        if monitor.showDualStackedMenuBar {
+        if mode == .dualStacked {
             let dualActive = (activeStatusItem === dualStackedItem)
             let dualView = AnyView(
                 DualStackedMenuBarView(
@@ -173,6 +235,7 @@ public final class StatusBarManager: NSObject, NSPopoverDelegate {
                 )
             )
             setHostingView(for: dualStackedItem, hosting: &dualStackedHosting, view: dualView, width: dualActive ? 42 : 36)
+            return
         }
         
         // 3. Disk View
@@ -378,6 +441,7 @@ public final class StatusBarManager: NSObject, NSPopoverDelegate {
     }
     
     // MARK: - Actions
+    @objc private func toggleUnified() { toggle(unifiedPopover, for: unifiedItem) }
     @objc private func toggleCompactHealth() { toggle(compactHealthPopover, for: compactHealthItem) }
     @objc private func toggleDualStacked() { toggle(dualStackedPopover, for: dualStackedItem) }
     @objc private func toggleDisk() { toggle(diskPopover, for: diskItem) }
@@ -524,7 +588,7 @@ public final class StatusBarManager: NSObject, NSPopoverDelegate {
     }
     
     public func closeAllPopovers() {
-        [compactHealthPopover, dualStackedPopover, diskPopover, memoryPopover, cpuPopover, networkPopover, batteryPopover, sensorPopover, fansPopover, gpuPopover].forEach {
+        [unifiedPopover, compactHealthPopover, dualStackedPopover, diskPopover, memoryPopover, cpuPopover, networkPopover, batteryPopover, sensorPopover, fansPopover, gpuPopover].forEach {
             $0?.performClose(nil)
         }
     }

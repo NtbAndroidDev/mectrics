@@ -153,7 +153,49 @@ public struct SettingsView: View {
                 }
                 
                 HStack(spacing: 14) {
-                    if monitor.useCompactHealthBar {
+                    switch monitor.menuBarMode {
+                    case .unified:
+                        HStack(spacing: 6) {
+                            ZStack {
+                                RoundedRectangle(cornerRadius: 3.5)
+                                    .fill(Color(white: 0.18))
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 3.5)
+                                            .stroke(Color.white.opacity(0.25), lineWidth: 0.8)
+                                    )
+                                Text("M")
+                                    .font(.system(size: 10, weight: .black, design: .rounded))
+                                    .foregroundStyle(.white)
+                            }
+                            .frame(width: 17, height: 17)
+                            
+                            HStack(spacing: 6) {
+                                HStack(spacing: 2) {
+                                    Text("CPU")
+                                        .font(.system(size: 10, weight: .regular, design: .monospaced))
+                                        .foregroundStyle(Color.white.opacity(0.75))
+                                    Text(String(format: "%.0f%%", monitor.cpu.totalUsage))
+                                        .font(.system(size: 10.5, weight: .semibold, design: .monospaced))
+                                        .foregroundStyle(.white)
+                                }
+                                HStack(spacing: 2) {
+                                    Text("RAM")
+                                        .font(.system(size: 10, weight: .regular, design: .monospaced))
+                                        .foregroundStyle(Color.white.opacity(0.75))
+                                    Text(String(format: "%.0f%%", monitor.memory.usagePercentage))
+                                        .font(.system(size: 10.5, weight: .semibold, design: .monospaced))
+                                        .foregroundStyle(.white)
+                                }
+                            }
+                        }
+                        
+                    case .dualStacked:
+                        DualStackedMenuBarView(
+                            cpuUsage: monitor.cpu.totalUsage,
+                            memUsage: monitor.memory.usagePercentage
+                        )
+                        
+                    case .compactHealth:
                         HStack(spacing: 4) {
                             Image(systemName: "checkmark.shield")
                                 .font(.system(size: 11, weight: .semibold))
@@ -162,7 +204,8 @@ public struct SettingsView: View {
                                 .font(.system(size: 11, weight: .medium))
                                 .foregroundStyle(.white)
                         }
-                    } else {
+                        
+                    case .separate:
                         if monitor.showDiskInMenuBar {
                             HStack(spacing: 4) {
                                 Image(systemName: "internaldrive")
@@ -276,56 +319,57 @@ public struct SettingsView: View {
                 )
             }
             
-            // Menu Bar Optimization & Display Style
+            // Menu Bar Mode Selector
             VStack(alignment: .leading, spacing: 12) {
-                Text(loc("Menu Bar Optimization"))
+                Text(loc("Display Mode"))
                     .font(.system(size: 13, weight: .bold))
                     .foregroundStyle(.white)
                 
-                // 1. Dual Stacked CPU & RAM (Option 1)
-                Toggle(loc("Dual Stacked CPU & RAM (35px Slot)"), isOn: $monitor.showDualStackedMenuBar)
-                    .toggleStyle(SwitchToggleStyle(tint: MectricsTheme.coral))
-                
-                Text(loc("Dual Stacked Note"))
-                    .font(.system(size: 11))
-                    .foregroundStyle(MectricsTheme.textSecondary)
-                
-                Divider().overlay(Color.white.opacity(0.08))
-                
-                // 2. Display Style Selector (Option 2)
-                VStack(alignment: .leading, spacing: 6) {
-                    Text(loc("Item Width & Style"))
-                        .font(.system(size: 11.5, weight: .semibold))
-                        .foregroundStyle(.white)
-                    
-                    Picker("", selection: $monitor.menuBarDisplayStyle) {
-                        ForEach(MenuBarDisplayStyle.allCases, id: \.self) { style in
-                            Text(loc(style.rawValue)).tag(style)
-                        }
+                Picker("", selection: $monitor.menuBarMode) {
+                    ForEach(MenuBarMode.allCases, id: \.self) { mode in
+                        Text(loc(mode.rawValue)).tag(mode)
                     }
-                    .pickerStyle(.segmented)
-                    
-                    Text(loc("Display Style Note"))
-                        .font(.system(size: 10.5))
-                        .foregroundStyle(MectricsTheme.textTertiary)
                 }
+                .pickerStyle(.segmented)
                 
-                Divider().overlay(Color.white.opacity(0.08))
-                
-                // 3. Compact Health Mode
-                Toggle(loc("Compact Health Mode (Single Shield Slot)"), isOn: $monitor.useCompactHealthBar)
-                    .toggleStyle(SwitchToggleStyle(tint: MectricsTheme.coral))
-                
-                Text(loc("Compact Health Note"))
-                    .font(.system(size: 11))
-                    .foregroundStyle(MectricsTheme.textSecondary)
+                if monitor.menuBarMode == .unified {
+                    Text(loc("Unified Sample Note"))
+                        .font(.system(size: 11))
+                        .foregroundStyle(MectricsTheme.textSecondary)
+                } else if monitor.menuBarMode == .dualStacked {
+                    Text(loc("Dual Stacked Note"))
+                        .font(.system(size: 11))
+                        .foregroundStyle(MectricsTheme.textSecondary)
+                } else if monitor.menuBarMode == .compactHealth {
+                    Text(loc("Compact Health Note"))
+                        .font(.system(size: 11))
+                        .foregroundStyle(MectricsTheme.textSecondary)
+                } else {
+                    // Separate items styling
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text(loc("Item Width & Style"))
+                            .font(.system(size: 11.5, weight: .semibold))
+                            .foregroundStyle(.white)
+                        
+                        Picker("", selection: $monitor.menuBarDisplayStyle) {
+                            ForEach(MenuBarDisplayStyle.allCases, id: \.self) { style in
+                                Text(loc(style.rawValue)).tag(style)
+                            }
+                        }
+                        .pickerStyle(.segmented)
+                        
+                        Text(loc("Display Style Note"))
+                            .font(.system(size: 10.5))
+                            .foregroundStyle(MectricsTheme.textTertiary)
+                    }
+                }
             }
             .padding(14)
             .background(Color.white.opacity(0.04))
             .clipShape(RoundedRectangle(cornerRadius: 8))
             
-            // Individual Items Configuration
-            if !monitor.useCompactHealthBar {
+            // Individual Items Configuration (Only shown in Separate mode)
+            if monitor.menuBarMode == .separate {
                 VStack(alignment: .leading, spacing: 14) {
                     HStack {
                         Text(loc("Visible Status Bar Items"))

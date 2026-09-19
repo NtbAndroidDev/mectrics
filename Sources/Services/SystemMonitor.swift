@@ -1,6 +1,13 @@
 import Foundation
 import Combine
 
+public enum MenuBarMode: String, Codable, CaseIterable {
+    case unified = "Unified Sample ([M] CPU RAM)"
+    case dualStacked = "Dual Stacked (35px Micro Slot)"
+    case compactHealth = "Compact Shield"
+    case separate = "Separate Individual Items"
+}
+
 public enum MenuBarDisplayStyle: String, Codable, CaseIterable {
     case full = "Wide"       // Icon + Text + Sparkline
     case compact = "Medium"  // Icon + Text (No sparkline)
@@ -50,6 +57,10 @@ public final class SystemMonitor: ObservableObject {
     public let rulesEngine = RulesEngine()
     
     // Preferences & Settings (Persisted in UserDefaults)
+    @Published public var menuBarMode: MenuBarMode {
+        didSet { UserDefaults.standard.set(menuBarMode.rawValue, forKey: "pref_menuBarMode") }
+    }
+    
     @Published public var updateInterval: Double {
         didSet {
             UserDefaults.standard.set(updateInterval, forKey: "pref_updateInterval")
@@ -164,6 +175,7 @@ public final class SystemMonitor: ObservableObject {
         // Register defaults
         let defaults = UserDefaults.standard
         defaults.register(defaults: [
+            "pref_menuBarMode": MenuBarMode.unified.rawValue,
             "pref_updateInterval": 1.0,
             "pref_useCompactHealthBar": false,
             "pref_showDualStackedMenuBar": false,
@@ -184,6 +196,7 @@ public final class SystemMonitor: ObservableObject {
         ])
         
         // Load persisted settings
+        self.menuBarMode = MenuBarMode(rawValue: defaults.string(forKey: "pref_menuBarMode") ?? "") ?? .unified
         let savedInterval = defaults.double(forKey: "pref_updateInterval")
         self.updateInterval = savedInterval >= 0.5 ? savedInterval : 1.0
         self.useCompactHealthBar = defaults.bool(forKey: "pref_useCompactHealthBar")
