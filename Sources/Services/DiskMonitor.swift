@@ -9,15 +9,64 @@ public final class DiskMonitor: DiskMonitoring, @unchecked Sendable {
     private var isFirstSample = true
     private let lock = NSLock()
     
+    // Background caches
+    private var cachedVolumes: [VolumeInfo] = []
+    private var lastVolumesScan = Date.distantPast
+    
     public init() {}
     
+    // Capacity snapshot cache: volumeAvailableCapacityForImportantUsageKey round-trips through the
+    // CacheDelete daemon (XPC) on every call, which dominated per-tick CPU when sampled each second.
+    private var cachedCapacity: DiskMetrics?
+    private var lastCapacityScan = Date.distantPast
+    private static let capacityRefreshInterval: TimeInterval = 30.0
+
     public func sample() -> DiskMetrics {
         lock.lock()
         defer { lock.unlock() }
-        
+
+        // 1. Capacity & Free Space (cached, changes slowly)
+        var metrics = sampleCapacity()
+
+        // 2. Disk I/O Throughput via IOKit (IOBlockStorageDriver)
+        let (currentRead, currentWrite) = readDiskIOStats()
+        let now = Date()
+        let elapsed = max(0.1, now.timeIntervalSince(previousTimestamp))
+
+        if !isFirstSample {
+            let rDiff = currentRead >= previousReadBytes ? (currentRead - previousReadBytes) : 0
+            let wDiff = currentWrite >= previousWriteBytes ? (currentWrite - previousWriteBytes) : 0
+
+            metrics.readBytesPerSec = Double(rDiff) / elapsed
+            metrics.writeBytesPerSec = Double(wDiff) / elapsed
+        } else {
+            isFirstSample = false
+            metrics.readBytesPerSec = 0
+            metrics.writeBytesPerSec = 0
+        }
+
+        previousReadBytes = currentRead
+        previousWriteBytes = currentWrite
+        previousTimestamp = now
+
+        // 3. Mounted Volumes Scan (Internal & External/USB)
+        metrics.volumes = scanMountedVolumes()
+
+        // Background trash size calculation
+        scanTrashInBackground()
+        metrics.trashBytes = cachedTrashBytes
+
+        return metrics
+    }
+
+    private func sampleCapacity() -> DiskMetrics {
+        let now = Date()
+        if let cached = cachedCapacity, now.timeIntervalSince(lastCapacityScan) < Self.capacityRefreshInterval {
+            return cached
+        }
+        lastCapacityScan = now
+
         var metrics = DiskMetrics()
-        
-        // 1. Capacity & Free Space via FileManager
         do {
             let rootURL = URL(fileURLWithPath: "/")
             let values = try rootURL.resourceValues(forKeys: [
@@ -59,39 +108,18 @@ public final class DiskMonitor: DiskMonitoring, @unchecked Sendable {
                 }
             }
         }
-        
-        // 2. Disk I/O Throughput via IOKit (IOBlockStorageDriver)
-        let (currentRead, currentWrite) = readDiskIOStats()
-        let now = Date()
-        let elapsed = max(0.1, now.timeIntervalSince(previousTimestamp))
-        
-        if !isFirstSample {
-            let rDiff = currentRead >= previousReadBytes ? (currentRead - previousReadBytes) : 0
-            let wDiff = currentWrite >= previousWriteBytes ? (currentWrite - previousWriteBytes) : 0
-            
-            metrics.readBytesPerSec = Double(rDiff) / elapsed
-            metrics.writeBytesPerSec = Double(wDiff) / elapsed
-        } else {
-            isFirstSample = false
-            metrics.readBytesPerSec = 0
-            metrics.writeBytesPerSec = 0
-        }
-        
-        previousReadBytes = currentRead
-        previousWriteBytes = currentWrite
-        previousTimestamp = now
-        
-        // 3. Mounted Volumes Scan (Internal & External/USB)
-        metrics.volumes = scanMountedVolumes()
-        
-        // Background trash size calculation
-        scanTrashInBackground()
-        metrics.trashBytes = cachedTrashBytes
-        
+
+        cachedCapacity = metrics
         return metrics
     }
     
     private func scanMountedVolumes() -> [VolumeInfo] {
+        let now = Date()
+        if now.timeIntervalSince(lastVolumesScan) < 20.0 && !cachedVolumes.isEmpty {
+            return cachedVolumes
+        }
+        lastVolumesScan = now
+        
         guard let urls = FileManager.default.mountedVolumeURLs(
             includingResourceValuesForKeys: [
                 .volumeNameKey,
@@ -102,7 +130,7 @@ public final class DiskMonitor: DiskMonitoring, @unchecked Sendable {
             ],
             options: [.skipHiddenVolumes]
         ) else {
-            return []
+            return cachedVolumes
         }
         
         var list: [VolumeInfo] = []
@@ -132,7 +160,9 @@ public final class DiskMonitor: DiskMonitoring, @unchecked Sendable {
                 ))
             }
         }
-        return list.sorted { $0.totalBytes > $1.totalBytes }
+        let sorted = list.sorted { $0.totalBytes > $1.totalBytes }
+        cachedVolumes = sorted
+        return sorted
     }
     
     public static func ejectVolume(url: URL) {
@@ -150,7 +180,7 @@ public final class DiskMonitor: DiskMonitoring, @unchecked Sendable {
     private var isScanningTrash = false
 
     private func scanTrashInBackground() {
-        guard !isScanningTrash && Date().timeIntervalSince(lastTrashScan) >= 10.0 else { return }
+        guard !isScanningTrash && Date().timeIntervalSince(lastTrashScan) >= 180.0 else { return }
         isScanningTrash = true
         DispatchQueue.global(qos: .utility).async { [weak self] in
             var size: UInt64 = 0

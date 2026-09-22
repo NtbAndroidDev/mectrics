@@ -39,6 +39,8 @@ public struct MenuBarItemView: View {
                 .font(.system(size: 11, weight: .semibold, design: .monospaced))
                 .monospacedDigit()
                 .foregroundStyle(.white)
+                .lineLimit(1)
+                .fixedSize()
             
             if displayStyle == .full, let values = sparklineValues, values.count >= 2 {
                 if isBoxedSparkline {

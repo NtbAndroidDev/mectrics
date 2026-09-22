@@ -39,4 +39,20 @@ public final class SleepBlocker: ObservableObject {
             }
         }
     }
+    
+    /// Temporarily release assertion when system enters sleep to avoid blocking clamshell sleep
+    public func suspendAssertion() {
+        if assertionID != 0 {
+            IOPMAssertionRelease(assertionID)
+            assertionID = 0
+        }
+    }
+    
+    /// Re-engage assertion upon legitimate wake if user preference is active
+    public func restoreAssertionIfNeeded() {
+        if isKeepAwakeActive && assertionID == 0 {
+            toggleSleepAssertion(true)
+        }
+    }
 }
+

@@ -243,6 +243,8 @@ public final class SystemMonitor: ObservableObject {
                 self?.refreshAll()
             }
         }
+        // Let the OS coalesce wakeups with other timers instead of firing at an exact deadline
+        timer?.tolerance = interval * 0.2
         RunLoop.main.add(timer!, forMode: .common)
     }
     
@@ -267,9 +269,15 @@ public final class SystemMonitor: ObservableObject {
         let sensorMon = self.sensorMonitor
         
         // Smart adaptive sampling: reduce frequency of heavy IOKit queries if inactive in Menu Bar
-        let shouldSampleGPU = showGPUInMenuBar || (cycle % 4 == 0)
-        let shouldSampleSensors = showSensorInMenuBar || (cycle % 3 == 0)
-        let shouldSampleBattery = (showBatteryInMenuBar && battery.isPresent) || (cycle % 5 == 0)
+        // When on battery power, throttle background hardware probes further to conserve energy
+        let isOnBattery = battery.isPresent && !battery.isPluggedIn
+        let gpuModulo: UInt64 = isOnBattery ? 8 : 4
+        let sensorModulo: UInt64 = isOnBattery ? 6 : 3
+        let batModulo: UInt64 = isOnBattery ? 8 : 5
+        
+        let shouldSampleGPU = showGPUInMenuBar || (cycle % gpuModulo == 0)
+        let shouldSampleSensors = showSensorInMenuBar || (cycle % sensorModulo == 0)
+        let shouldSampleBattery = (showBatteryInMenuBar && battery.isPresent) || (cycle % batModulo == 0)
         
         let lastBattery = self.battery
         let lastGPU = self.gpu
@@ -285,7 +293,10 @@ public final class SystemMonitor: ObservableObject {
             let newSensors = shouldSampleSensors ? sensorMon.sample() : lastSensors
             
             await MainActor.run { [weak self] in
-                guard let self = self else { return }
+                guard let self = self, !self.isPaused else {
+                    self?.isRefreshing = false
+                    return
+                }
                 self.applyMetrics(
                     cpu: newCPU,
                     mem: newMem,

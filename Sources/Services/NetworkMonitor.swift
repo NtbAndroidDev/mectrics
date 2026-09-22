@@ -14,9 +14,13 @@ public final class NetworkMonitor: NetworkMonitoring, @unchecked Sendable {
     private var cachedPingMs: Double? = nil
     private var isPinging = false
     
+    private var lastWiFiCheck = Date.distantPast
+    private var cachedWiFiRssi: Int? = nil
+    private var cachedWiFiTxRate: Double? = nil
+    private var cachedWiFiSsid: String? = nil
+    
     private var lastPublicIPCheck = Date.distantPast
     private var cachedPublicIP: String? = nil
-    private var isFetchingPublicIP = false
     
     private var lastGatewayCheck = Date.distantPast
     private var cachedGatewayIP: String? = nil
@@ -101,41 +105,48 @@ public final class NetworkMonitor: NetworkMonitoring, @unchecked Sendable {
         previousOutBytes = currentOutBytes
         previousTimestamp = now
         
-        // 1. Wi-Fi details via CoreWLAN
+        // 1. Wi-Fi details via CoreWLAN (cached every 10s to prevent continuous radio driver wakes)
         enrichWiFi(&metrics)
         
-        // 2. Gateway IP
-        if Date().timeIntervalSince(lastGatewayCheck) >= 30.0 || cachedGatewayIP == nil {
+        // 2. Gateway IP (cached every 180s)
+        if Date().timeIntervalSince(lastGatewayCheck) >= 180.0 || cachedGatewayIP == nil {
             cachedGatewayIP = fetchGatewayIP()
             lastGatewayCheck = Date()
         }
         metrics.gatewayIpAddress = cachedGatewayIP
         
-        // 3. Ping Latency in background
-        measurePingInBackground()
+        // 3. Ping Latency in background (every 60s, only when active connection detected)
+        if metrics.isConnected {
+            measurePingInBackground()
+        }
         metrics.pingLatencyMs = cachedPingMs
         
-        // 4. Public IP in background
-        fetchPublicIPInBackground()
-        metrics.publicIpAddress = cachedPublicIP
+        // 4. Public IP: keep privacy guarantee (zero external network requests)
+        metrics.publicIpAddress = ipAddress != "127.0.0.1" ? ipAddress : "Local"
         
         return metrics
     }
     
     private func enrichWiFi(_ metrics: inout NetworkMetrics) {
-        if let iface = CWWiFiClient.shared().interface() {
-            let rssi = iface.rssiValue()
-            if rssi != 0 {
-                metrics.wifiRssi = rssi
-            }
-            let rate = iface.transmitRate()
-            if rate > 0 {
-                metrics.wifiTxRate = rate
-            }
-            if let ssid = iface.ssid(), !ssid.isEmpty {
-                metrics.wifiSsid = ssid
+        let now = Date()
+        if now.timeIntervalSince(lastWiFiCheck) >= 10.0 {
+            lastWiFiCheck = now
+            if let iface = CWWiFiClient.shared().interface() {
+                let rssi = iface.rssiValue()
+                cachedWiFiRssi = rssi != 0 ? rssi : nil
+                let rate = iface.transmitRate()
+                cachedWiFiTxRate = rate > 0 ? rate : nil
+                if let ssid = iface.ssid(), !ssid.isEmpty {
+                    cachedWiFiSsid = ssid
+                } else {
+                    cachedWiFiSsid = nil
+                }
             }
         }
+        
+        metrics.wifiRssi = cachedWiFiRssi
+        metrics.wifiTxRate = cachedWiFiTxRate
+        metrics.wifiSsid = cachedWiFiSsid
     }
     
     private func fetchGatewayIP() -> String? {
@@ -163,49 +174,9 @@ public final class NetworkMonitor: NetworkMonitoring, @unchecked Sendable {
         } catch {}
         return nil
     }
-    
-    private func fetchPublicIPInBackground() {
-        guard !isFetchingPublicIP && (Date().timeIntervalSince(lastPublicIPCheck) >= 300.0 || cachedPublicIP == nil) else { return }
-        isFetchingPublicIP = true
-        
-        Task.detached(priority: .utility) { [weak self] in
-            guard let url = URL(string: "https://api.ipify.org") else {
-                self?.resetPublicIPFetch()
-                return
-            }
-            var request = URLRequest(url: url)
-            request.timeoutInterval = 3.0
-            
-            do {
-                let (data, _) = try await URLSession.shared.data(for: request)
-                if let ip = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines),
-                   !ip.isEmpty {
-                    self?.updatePublicIP(ip)
-                    return
-                }
-            } catch {}
-            
-            self?.resetPublicIPFetch()
-        }
-    }
-    
-    private func updatePublicIP(_ ip: String) {
-        lock.lock()
-        defer { lock.unlock() }
-        cachedPublicIP = ip
-        lastPublicIPCheck = Date()
-        isFetchingPublicIP = false
-    }
-    
-    private func resetPublicIPFetch() {
-        lock.lock()
-        defer { lock.unlock() }
-        lastPublicIPCheck = Date()
-        isFetchingPublicIP = false
-    }
 
     private func measurePingInBackground() {
-        guard !isPinging && Date().timeIntervalSince(lastPingCheck) >= 5.0 else { return }
+        guard !isPinging && Date().timeIntervalSince(lastPingCheck) >= 60.0 else { return }
         isPinging = true
         DispatchQueue.global(qos: .utility).async { [weak self] in
             let start = DispatchTime.now()
